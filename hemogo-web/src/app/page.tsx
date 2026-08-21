@@ -35,7 +35,7 @@ export default function Home() {
             </Link>
             <Link 
               href="/register" 
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-foreground font-semibold text-lg hover:bg-gray-50 border border-gray-200 transition-all shadow-sm flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-gray-900 font-semibold text-lg hover:bg-gray-50 border border-gray-200 transition-all shadow-sm flex items-center justify-center gap-2"
             >
               Become a Donor <Heart className="w-5 h-5 text-brand-500" />
             </Link>
