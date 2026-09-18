@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    // ============================================================================
+    // 1. Users Collection (/users/{userId})
+    // ============================================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'premiumStatus', 'status'])) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // 2. Donors Collection (/donors/{donorId})
+    // STRICT ZERO-SCRAPE PRIVACY: Normal users CANNOT query or browse the donor directory!
+    // ============================================================================
+    match /donors/{donorId} {
+      // Only the donor themselves or an administrator can read a donor's profile
+      allow read: if isOwner(donorId) || isAdmin();
+
+      // Donor registration
+      allow create: if isOwner(donorId) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.verificationStatus == false &&
+        request.resource.data.premiumStatus == false;
+
+      // Donor updates their own availability / details (cannot self-grant verification or premium)
+      allow update: if (isOwner(donorId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'premiumStatus', 'premiumExpiry'])) || isAdmin();
+
+      allow delete: if isOwner(donorId) || isAdmin();
+    }
+
+    // ============================================================================
+    // 3. Blood Emergency Requests (/bloodRequests/{requestId})
+    // ============================================================================
+    match /bloodRequests/{requestId} {
+      // Authenticated users and matching engine can read requests
+      allow read: if isAuthenticated();
+
+      // Requester can create a new blood emergency request
+      allow create: if isAuthenticated() &&
+        request.resource.data.requesterId == request.auth.uid &&
+        request.resource.data.status in ['SEARCHING', 'DONORS_NOTIFIED'];
+
+      // Only requester or admin can cancel/fulfill request
+      allow update: if (isAuthenticated() && resource.data.requesterId == request.auth.uid) || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // 4. Matches Collection (/matches/{matchId})
+    // Contacts only shared when donor accepts after preliminary screening
+    // ============================================================================
+    match /matches/{matchId} {
+      // A donor can read matches sent to them; a requester can read matches for their request
+      allow read: if isAuthenticated() && (
+        resource.data.donorId == request.auth.uid ||
+        resource.data.requestId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeRequests ||
+        isAdmin()
+      );
+
+      // Matches are created and orchestrated by server-side Cloud Functions / Admin
+      allow create: if isAdmin();
+
+      // Donor can update their response (ACCEPT / REJECT) with screening responses
+      allow update: if isAuthenticated() && resource.data.donorId == request.auth.uid;
+
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // 5. Subscriptions (/subscriptions/{subId})
+    // ============================================================================
+    match /subscriptions/{subId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin(); // Only Cloud Functions (Admin SDK) upon verified Razorpay HMAC
+    }
+
+    // ============================================================================
+    // 6. Audit Logs (/auditLogs/{logId})
+    // ============================================================================
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
