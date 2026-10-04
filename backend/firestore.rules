@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 2. Donors Collection
+    match /donors/{donorId} {
+      // Requesters CANNOT query this collection to browse donors.
+      // Only the Cloud Functions (admin) can search this collection.
+      allow read, write: if isOwner(donorId);
+    }
+
+    // 3. Blood Requests Collection
+    match /bloodRequests/{requestId} {
+      allow create: if isAuthenticated();
+      allow read, update: if isAuthenticated() && resource.data.requesterId == request.auth.uid;
+    }
+
+    // 4. Matches Collection
+    match /matches/{matchId} {
+      // Donors can read matches assigned to them (to Accept/Reject)
+      allow read, update: if isAuthenticated() && resource.data.donorId == request.auth.uid;
+      // Requesters can only read matches for their request, AND only if the donor accepted.
+      allow read: if isAuthenticated() && resource.data.requesterId == request.auth.uid && resource.data.status == 'ACCEPTED';
+    }
+  }
+}
