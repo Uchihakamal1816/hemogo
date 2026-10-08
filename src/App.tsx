@@ -10,6 +10,7 @@ import {
   type DEMO_PRESET_USERS, 
   setDemoUserPreset 
 } from './services/authService';
+import { parseDeepLinkRoute } from './services/deepLinkService';
 import { Navbar } from './components/common/Navbar';
 import { LandingPage } from './components/home/LandingPage';
 import { PhoneAuthModal } from './components/auth/PhoneAuthModal';
@@ -31,6 +32,12 @@ export const App: React.FC = () => {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   useEffect(() => {
+    // Check deep-link query parameters on launch
+    const deepLink = parseDeepLinkRoute();
+    if (deepLink.tab) {
+      setActiveTab(deepLink.tab);
+    }
+
     const savedUser = getCurrentSessionUser();
     if (savedUser) {
       setCurrentUser(savedUser);

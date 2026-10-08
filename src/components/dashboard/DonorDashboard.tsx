@@ -13,7 +13,9 @@ import {
   Droplets,
   PhoneCall,
   X,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare,
+  Award
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { 
@@ -32,6 +34,8 @@ import {
   acceptMatchWithScreening, 
   rejectMatch 
 } from '../../services/emergencyService';
+import { EmergencyChatModal } from '../chat/EmergencyChatModal';
+import { DonationHistoryModal } from '../history/DonationHistoryModal';
 
 interface DonorDashboardProps {
   currentUser: UserProfile | null;
@@ -53,7 +57,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Preliminary Medical Screening Modal State (PRD Section 10)
+  // Modals & Chat
   const [activeScreeningMatch, setActiveScreeningMatch] = useState<MatchRecord | null>(null);
   const [screeningAnswers, setScreeningAnswers] = useState({
     feelingWell: true,
@@ -65,6 +69,9 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   });
   const [acceptedContactInfo, setAcceptedContactInfo] = useState<any | null>(null);
   const [submittingScreening, setSubmittingScreening] = useState(false);
+
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [showDonationHistory, setShowDonationHistory] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -163,6 +170,8 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
       });
 
       setAcceptedContactInfo({
+        requestId: result.request.requestId,
+        matchId: activeScreeningMatch.matchId,
         patientName: result.request.patientName,
         hospitalName: result.request.hospitalName,
         hospitalPinCode: result.request.hospitalPinCode,
@@ -260,7 +269,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         </div>
       )}
 
-      {/* Connected Requester Card upon successful acceptance (PRD Section 11) */}
+      {/* Connected Requester Card upon successful acceptance */}
       {acceptedContactInfo && (
         <div className="p-6 rounded-2xl bg-emerald-950/90 border-2 border-emerald-500 text-slate-100 space-y-3 shadow-xl">
           <div className="flex items-center justify-between">
@@ -280,24 +289,33 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
               <div className="text-slate-300">{acceptedContactInfo.hospitalName} (PIN: {acceptedContactInfo.hospitalPinCode})</div>
             </div>
 
-            <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-bold">Requester Phone</div>
                 <div className="font-mono font-bold text-white text-sm">{acceptedContactInfo.requesterPhone}</div>
               </div>
-              <a
-                href={`tel:${acceptedContactInfo.requesterPhone}`}
-                className="btn-emerald !py-2 !px-3.5 text-xs font-bold flex items-center gap-1.5"
-              >
-                <PhoneCall className="w-3.5 h-3.5" />
-                <span>Call Now</span>
-              </a>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowChatModal(true)}
+                  className="btn-secondary !py-2 !px-3 text-xs font-bold flex items-center gap-1"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Chat</span>
+                </button>
+                <a
+                  href={`tel:${acceptedContactInfo.requesterPhone}`}
+                  className="btn-emerald !py-2 !px-3 text-xs font-bold flex items-center gap-1"
+                >
+                  <PhoneCall className="w-3.5 h-3.5" />
+                  <span>Call</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Profile & Live Availability Bar (PRD Section 15) */}
+      {/* Profile & Live Availability Bar */}
       <div className="glass-panel p-6 sm:p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
         <div className="flex items-center gap-5">
           <div className="w-16 h-16 rounded-2xl bg-red-600 border-2 border-red-400 flex flex-col items-center justify-center text-white font-black text-xl shadow-xl shadow-red-950">
@@ -325,7 +343,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
           </div>
         </div>
 
-        {/* Availability Switch (PRD Section 15) */}
+        {/* Availability Switch */}
         <div className="w-full lg:w-auto flex flex-col sm:flex-row items-center gap-4 bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
           <div className="text-left sm:text-right">
             <div className="text-xs font-bold text-slate-200">
@@ -351,7 +369,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         </div>
       </div>
 
-      {/* Live Incoming Emergency Alerts (PRD Section 8 & 9) */}
+      {/* Live Incoming Emergency Alerts */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-white flex items-center gap-2">
@@ -396,7 +414,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* ACCEPT / REJECT Buttons (PRD Section 9) */}
+                {/* ACCEPT / REJECT Buttons */}
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                   <button
                     onClick={() => handleReject(match.matchId)}
@@ -421,31 +439,49 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
       {/* History Metrics & HemoGo Premium Card */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* Request History */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="font-bold text-white text-base flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span>Donor Request History</span>
-          </h3>
+        {/* Request History with View Certificates Button */}
+        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Donor Request History</span>
+              </h3>
+              <button
+                onClick={() => setShowDonationHistory(true)}
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>Certificates</span>
+              </button>
+            </div>
 
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
-            <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-              <div className="text-xl font-bold text-white">{donor.totalRequestsReceived || 12}</div>
-              <div className="text-[10px] text-slate-400">Received</div>
-            </div>
-            <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-              <div className="text-xl font-bold text-emerald-400">{donor.totalAccepted || 8}</div>
-              <div className="text-[10px] text-slate-400">Accepted</div>
-            </div>
-            <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-              <div className="text-xl font-bold text-slate-400">{donor.totalRejected || 1}</div>
-              <div className="text-[10px] text-slate-400">Rejected</div>
-            </div>
-            <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-              <div className="text-xl font-bold text-red-400">{donor.totalCompleted || 6}</div>
-              <div className="text-[10px] text-slate-400">Completed</div>
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                <div className="text-xl font-bold text-white">{donor.totalRequestsReceived || 12}</div>
+                <div className="text-[10px] text-slate-400">Received</div>
+              </div>
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                <div className="text-xl font-bold text-emerald-400">{donor.totalAccepted || 8}</div>
+                <div className="text-[10px] text-slate-400">Accepted</div>
+              </div>
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                <div className="text-xl font-bold text-slate-400">{donor.totalRejected || 1}</div>
+                <div className="text-[10px] text-slate-400">Rejected</div>
+              </div>
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                <div className="text-xl font-bold text-red-400">{donor.totalCompleted || 6}</div>
+                <div className="text-[10px] text-slate-400">Completed</div>
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={() => setShowDonationHistory(true)}
+            className="w-full btn-secondary !py-2 text-xs font-bold justify-center"
+          >
+            <span>View Verified Donation Records</span>
+          </button>
         </div>
 
         {/* HemoGo Premium ₹299/yr Card */}
@@ -482,7 +518,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
 
       </div>
 
-      {/* Preliminary Medical Screening Modal (PRD Section 10) */}
+      {/* Preliminary Medical Screening Modal */}
       {activeScreeningMatch && (
         <div className="modal-overlay">
           <div className="glass-panel-elevated w-full max-w-lg p-6 sm:p-8 relative bg-slate-900/95 border border-slate-700 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
@@ -563,7 +599,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
                 <span className="text-emerald-300 font-semibold">6. I am willing to undergo the blood bank's final medical screening before donation.</span>
               </label>
 
-              {/* Mandatory Medical Disclaimer (PRD Section 10 & 27) */}
+              {/* Mandatory Medical Disclaimer */}
               <div className="p-3.5 rounded-xl bg-amber-950/50 border border-amber-800/60 text-[11px] text-amber-300 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>
@@ -583,6 +619,29 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* In-App Chat Modal for Donor with Requester */}
+      {showChatModal && acceptedContactInfo && (
+        <EmergencyChatModal
+          isOpen={true}
+          requestId={acceptedContactInfo.requestId || 'HG10245'}
+          matchId={acceptedContactInfo.matchId || 'match_001'}
+          patientName={acceptedContactInfo.patientName}
+          hospitalName={acceptedContactInfo.hospitalName}
+          otherPartyName={acceptedContactInfo.patientName}
+          otherPartyPhone={acceptedContactInfo.requesterPhone}
+          currentUser={currentUser}
+          onClose={() => setShowChatModal(false)}
+        />
+      )}
+
+      {/* Donation History & Certificates Modal */}
+      <DonationHistoryModal
+        isOpen={showDonationHistory}
+        donorId={donor.donorId || currentUser.userId}
+        donorName={displayName}
+        onClose={() => setShowDonationHistory(false)}
+      />
 
     </div>
   );

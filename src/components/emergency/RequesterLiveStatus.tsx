@@ -6,7 +6,10 @@ import {
   UserCheck, 
   RefreshCw, 
   XCircle, 
-  PhoneCall 
+  PhoneCall,
+  MessageSquare,
+  Navigation,
+  Clock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { BloodRequest, MatchRecord, UserProfile } from '../../types/database';
@@ -16,6 +19,9 @@ import {
   markRequestFulfilled, 
   cancelBloodRequest 
 } from '../../services/emergencyService';
+import { EmergencyChatModal } from '../chat/EmergencyChatModal';
+import { DonorLiveTracker } from './DonorLiveTracker';
+import { PastEmergenciesModal } from '../history/PastEmergenciesModal';
 
 interface RequesterLiveStatusProps {
   currentUser: UserProfile | null;
@@ -32,9 +38,14 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
   const [selectedRequestId, setSelectedRequestId] = useState<string>('');
   const [matches, setMatches] = useState<MatchRecord[]>([]);
 
+  // Modals
+  const [activeChatMatch, setActiveChatMatch] = useState<MatchRecord | null>(null);
+  const [activeTrackerMatch, setActiveTrackerMatch] = useState<MatchRecord | null>(null);
+  const [showPastEmergencies, setShowPastEmergencies] = useState(false);
+
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 3000); // 3-second live poll for real-time donor response telemetry
+    const interval = setInterval(loadData, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -95,10 +106,16 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
         <p className="text-xs text-slate-400 max-w-md mx-auto">
           Need blood urgently? Raise an emergency request to dispatch immediate notifications to matching donors in the hospital PIN area.
         </p>
-        <button onClick={onOpenCreateEmergency} className="btn-primary !py-3 !px-6 text-sm font-bold mx-auto">
-          <Flame className="w-4 h-4" />
-          <span>Raise Blood Request Now</span>
-        </button>
+        <div className="flex justify-center gap-3 pt-2">
+          <button onClick={onOpenCreateEmergency} className="btn-primary !py-3 !px-6 text-sm font-bold">
+            <Flame className="w-4 h-4" />
+            <span>Raise Blood Request</span>
+          </button>
+          <button onClick={() => setShowPastEmergencies(true)} className="btn-secondary !py-3 !px-4 text-xs font-bold">
+            <Clock className="w-4 h-4" />
+            <span>Past Emergencies</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -110,26 +127,38 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
       
-      {/* Request Switcher Tabs if multiple requests exist */}
-      {requests.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {requests.map(r => (
-            <button
-              key={r.requestId}
-              onClick={() => handleSelectRequest(r.requestId)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                r.requestId === selectedRequestId
-                  ? 'bg-red-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-              }`}
-            >
-              #{r.requestId} ({r.bloodGroup} at {r.hospitalName})
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Top Bar Switcher & Past History Button */}
+      <div className="flex items-center justify-between gap-4">
+        {requests.length > 1 ? (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1">
+            {requests.map(r => (
+              <button
+                key={r.requestId}
+                onClick={() => handleSelectRequest(r.requestId)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  r.requestId === selectedRequestId
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                #{r.requestId} ({r.bloodGroup} at {r.hospitalName})
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div></div>
+        )}
 
-      {/* Main Request Live Status Card (PRD Section 12 & 13) */}
+        <button
+          onClick={() => setShowPastEmergencies(true)}
+          className="btn-secondary !py-2 !px-3.5 text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
+        >
+          <Clock className="w-3.5 h-3.5 text-amber-400" />
+          <span>Past Emergencies</span>
+        </button>
+      </div>
+
+      {/* Main Request Live Status Card */}
       <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-red-800/60 bg-gradient-to-br from-slate-900 via-slate-900 to-red-950/30 space-y-6">
         
         {/* Status Header */}
@@ -204,7 +233,7 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
           </div>
         </div>
 
-        {/* Donors Who Accepted Cards (PRD Section 13) */}
+        {/* Donors Who Accepted Cards with In-App Chat & GPS Tracker Buttons */}
         <div className="space-y-4 pt-2">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -220,7 +249,7 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
             <div className="p-8 rounded-xl bg-slate-950/60 border border-slate-800 text-center text-xs text-slate-400 space-y-2">
               <RefreshCw className="w-6 h-6 animate-spin mx-auto text-red-500" />
               <div className="font-semibold text-slate-300">We're actively contacting suitable donors in PIN {currentReq.hospitalPinCode}</div>
-              <p className="text-[11px]">As soon as a donor accepts and completes screening, their contact number will appear right here.</p>
+              <p className="text-[11px]">As soon as a donor accepts and completes screening, their contact and live chat will unlock here.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -255,20 +284,40 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
                     </span>
                   </div>
 
-                  {/* Mutual Contact Action Button */}
-                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
+                  {/* Actions: Direct Call, In-App Chat, and Live GPS Proximity Tracker */}
+                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <div className="text-[10px] text-slate-400 uppercase font-bold">Donor Phone</div>
-                      <div className="text-sm font-mono font-black text-white">{match.donorPhone}</div>
+                      <div className="text-xs font-mono font-black text-white">{match.donorPhone}</div>
                     </div>
 
-                    <a
-                      href={`tel:${match.donorPhone}`}
-                      className="btn-emerald !py-2 !px-4 text-xs font-black flex items-center gap-1.5 shadow-lg shadow-emerald-950"
-                    >
-                      <PhoneCall className="w-3.5 h-3.5" />
-                      <span>Call Donor</span>
-                    </a>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setActiveChatMatch(match)}
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1 transition-all"
+                        title="Open Private In-App Chat"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                        <span className="hidden sm:inline">Chat</span>
+                      </button>
+
+                      <button
+                        onClick={() => setActiveTrackerMatch(match)}
+                        className="p-2 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 text-xs font-bold flex items-center gap-1 transition-all"
+                        title="Live GPS & ETA Tracker"
+                      >
+                        <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="hidden sm:inline">ETA</span>
+                      </button>
+
+                      <a
+                        href={`tel:${match.donorPhone}`}
+                        className="btn-emerald !py-2 !px-3 text-xs font-black flex items-center gap-1"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" />
+                        <span>Call</span>
+                      </a>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -299,6 +348,46 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
         )}
 
       </div>
+
+      {/* In-App Chat Modal */}
+      {activeChatMatch && (
+        <EmergencyChatModal
+          isOpen={true}
+          requestId={currentReq.requestId}
+          matchId={activeChatMatch.matchId}
+          patientName={currentReq.patientName}
+          hospitalName={currentReq.hospitalName}
+          otherPartyName={activeChatMatch.donorName}
+          otherPartyPhone={activeChatMatch.donorPhone}
+          currentUser={currentUser}
+          onClose={() => setActiveChatMatch(null)}
+        />
+      )}
+
+      {/* Live GPS Distance & ETA Tracker Modal */}
+      {activeTrackerMatch && (
+        <DonorLiveTracker
+          isOpen={true}
+          donorId={activeTrackerMatch.donorId}
+          requestId={currentReq.requestId}
+          matchId={activeTrackerMatch.matchId}
+          donorName={activeTrackerMatch.donorName}
+          donorPhone={activeTrackerMatch.donorPhone}
+          hospitalName={currentReq.hospitalName}
+          onClose={() => setActiveTrackerMatch(null)}
+          onOpenChat={() => {
+            setActiveChatMatch(activeTrackerMatch);
+          }}
+        />
+      )}
+
+      {/* Past Emergencies Modal */}
+      <PastEmergenciesModal
+        isOpen={showPastEmergencies}
+        userId={currentUser.userId}
+        onClose={() => setShowPastEmergencies(false)}
+      />
+
     </div>
   );
 };

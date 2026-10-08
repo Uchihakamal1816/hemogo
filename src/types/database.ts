@@ -22,7 +22,7 @@ export interface UserProfile {
 export type DonorAvailability = 'available' | 'unavailable';
 
 export interface DonorProfile {
-  donorId: string; // matches userId
+  donorId: string;
   userId: string;
   name: string;
   phone: string;
@@ -56,7 +56,7 @@ export type BloodRequestStatus =
   | 'EXPIRED';
 
 export interface BloodRequest {
-  requestId: string; // e.g. "HG10245"
+  requestId: string;
   requesterId: string;
   patientName: string;
   requesterPhone: string;
@@ -93,7 +93,7 @@ export interface MatchRecord {
   requestId: string;
   donorId: string;
   donorName: string;
-  donorPhone: string; // Only revealed to requester upon ACCEPTED status
+  donorPhone: string;
   donorBloodGroup: BloodGroup;
   donorPinCode: string;
   isPremiumDonor: boolean;
@@ -110,7 +110,7 @@ export interface SubscriptionRecord {
   subscriptionId: string;
   userId: string;
   plan: 'hemogo_premium_annual';
-  amountPaise: number; // 29900 = ₹299
+  amountPaise: number;
   currency: 'INR';
   startDate: string;
   expiryDate: string;
@@ -132,9 +132,85 @@ export interface AuditLog {
   details: string;
 }
 
-export interface AdminSettings {
-  expansionIntervalMinutes: number;
-  maxNotificationRadiusKm: number;
-  neighborPinMap: Record<string, string[]>;
-  bloodCompatibilityMap: Record<BloodGroup, BloodGroup[]>;
+// ============================================================================
+// Next Phases: Real-Time Chat, Location Tracking, and History Types
+// ============================================================================
+
+export interface ChatMessage {
+  messageId: string;
+  requestId: string;
+  matchId: string;
+  senderId: string;
+  senderRole: 'requester' | 'donor' | 'system';
+  senderName: string;
+  text: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface DonorLiveLocation {
+  donorId: string;
+  requestId: string;
+  matchId: string;
+  donorName: string;
+  hospitalName: string;
+  currentLat: number;
+  currentLng: number;
+  hospitalLat: number;
+  hospitalLng: number;
+  distanceKm: number;
+  estimatedMinutes: number;
+  transportMode: 'bike' | 'car' | 'transit';
+  status: 'en_route' | 'nearby' | 'arrived';
+  lastUpdated: string;
+}
+
+export interface PastEmergencyRecord {
+  historyId: string;
+  requestId: string;
+  patientName: string;
+  hospitalName: string;
+  hospitalPinCode: string;
+  bloodGroup: BloodGroup;
+  unitsRequired: number;
+  status: BloodRequestStatus;
+  createdAt: string;
+  fulfilledAt?: string;
+  acceptedDonors: {
+    donorId: string;
+    donorName: string;
+    donorPhone: string;
+    bloodGroup: BloodGroup;
+  }[];
+}
+
+export interface DonationRecord {
+  donationId: string;
+  certificateId: string; // e.g. "CERT-HG-2026-9812"
+  donorId: string;
+  donorName: string;
+  requestId: string;
+  patientName: string;
+  hospitalName: string;
+  hospitalPinCode: string;
+  bloodGroup: BloodGroup;
+  unitsDonated: number;
+  donationType: 'Whole Blood' | 'Platelets' | 'Plasma';
+  donatedAt: string;
+  bloodBankVerified: boolean;
+  bloodBankDoctor: string;
+}
+
+export interface FCMNotificationPayload {
+  notification: {
+    title: string;
+    body: string;
+  };
+  data: {
+    type: 'EMERGENCY_DISPATCH' | 'DONOR_ACCEPTED' | 'CHAT_MESSAGE';
+    requestId: string;
+    matchId?: string;
+    deepLink: string;
+    webRoute: string;
+  };
 }
