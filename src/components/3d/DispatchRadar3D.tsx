@@ -62,7 +62,7 @@ export const DispatchRadar3D: React.FC = () => {
   }, []);
 
   return (
-    <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-red-900/50 bg-gradient-to-br from-slate-950 via-slate-900 to-red-950/25 relative overflow-hidden space-y-6">
+    <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-red-200 dark:border-red-900/50 bg-gradient-to-br from-white/80 via-slate-50/90 to-red-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-red-950/25 relative overflow-hidden space-y-6 shadow-xl shadow-slate-200/40 dark:shadow-none transition-colors">
       
       {/* Background ambient grid */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ef44440a_1px,transparent_1px),linear-gradient(to_bottom,#ef44440a_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none opacity-60"></div>
@@ -71,31 +71,31 @@ export const DispatchRadar3D: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-950/80 text-red-400 border border-red-800 text-[10px] font-bold">
-              <Radio className="w-3 h-3 text-red-500 animate-pulse" />
+            <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800 text-[10px] font-bold">
+              <Radio className="w-3 h-3 text-red-600 dark:text-red-500 animate-pulse" />
               24/7 Geodesic Radar
             </span>
-            <span className="text-xs text-slate-400 font-mono">PIN 530016 Center</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">PIN 530016 Center</span>
           </div>
-          <h3 className="text-xl sm:text-2xl font-black text-white mt-1">
+          <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">
             Holographic Emergency Dispatch Engine
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             Real-time geospatial matching: Hospital Epicenter $\rightarrow$ Same PIN $\rightarrow$ Neighbor PINs
           </p>
         </div>
 
         {/* Trigger Blood Group Buttons */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/90 p-1.5 rounded-2xl border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-400 px-2 hidden sm:inline">Emergency Blood:</span>
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-950/90 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <span className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 px-2 hidden sm:inline">Emergency Blood:</span>
           {(['O+', 'O-', 'A+', 'B+', 'AB+'] as BloodGroup[]).map(bg => (
             <button
               key={bg}
               onClick={() => handleTriggerDispatch(bg)}
               className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
                 selectedBlood === bg
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-900/50 scale-105'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/30 dark:shadow-red-900/50 scale-105'
+                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-800'
               }`}
             >
               {bg}
@@ -224,20 +224,20 @@ export const DispatchRadar3D: React.FC = () => {
 
         {/* Hovered Donor Floating Info Card */}
         {hoveredDonor && (
-          <div className="absolute bottom-4 left-4 z-30 p-3 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-2xl text-xs space-y-1 backdrop-blur-md">
+          <div className="absolute bottom-4 left-4 z-30 p-3 rounded-2xl bg-white/95 dark:bg-slate-950/95 border border-slate-200 dark:border-slate-700 shadow-2xl text-xs space-y-1 backdrop-blur-md">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-white">{hoveredDonor.name}</span>
-              <span className="px-1.5 py-0.2 rounded bg-red-950 text-red-400 font-bold border border-red-800 text-[10px]">
+              <span className="font-bold text-slate-900 dark:text-white">{hoveredDonor.name}</span>
+              <span className="px-1.5 py-0.2 rounded bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 font-bold border border-red-200 dark:border-red-800 text-[10px]">
                 {hoveredDonor.bloodGroup}
               </span>
               {hoveredDonor.isPremium && (
-                <span className="text-[9px] text-amber-400 font-bold">★ Premium</span>
+                <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold">★ Premium</span>
               )}
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
               PIN {hoveredDonor.pinCode} • {hoveredDonor.distanceKm} km from hospital
             </div>
-            <div className="text-[10px] font-bold text-emerald-400">
+            <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
               {hoveredDonor.status === 'connected' ? '✓ Dispatched & Accepted' : 'Ready for Alert'}
             </div>
           </div>
@@ -246,24 +246,24 @@ export const DispatchRadar3D: React.FC = () => {
       </div>
 
       {/* Telemetry Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-800 text-xs">
-        <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-center">
-          <div className="text-xl font-black text-white">4.2 min</div>
-          <div className="text-[10px] text-slate-400">Avg Dispatch Speed</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs">
+        <div className="p-3 bg-white/70 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-sm">
+          <div className="text-xl font-black text-slate-900 dark:text-white">4.2 min</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400">Avg Dispatch Speed</div>
         </div>
-        <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-center">
-          <div className="text-xl font-black text-emerald-400">
+        <div className="p-3 bg-white/70 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-sm">
+          <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
             {donors.filter(d => d.status === 'connected').length} Connected
           </div>
-          <div className="text-[10px] text-slate-400">Accepted {selectedBlood} Donors</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400">Accepted {selectedBlood} Donors</div>
         </div>
-        <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-center">
-          <div className="text-xl font-black text-amber-400">100%</div>
-          <div className="text-[10px] text-slate-400">Zero-Scrape Privacy</div>
+        <div className="p-3 bg-white/70 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-sm">
+          <div className="text-xl font-black text-amber-600 dark:text-amber-400">100%</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400">Zero-Scrape Privacy</div>
         </div>
-        <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-center">
-          <div className="text-xl font-black text-blue-400">15 km</div>
-          <div className="text-[10px] text-slate-400">Max Geodesic Range</div>
+        <div className="p-3 bg-white/70 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-sm">
+          <div className="text-xl font-black text-blue-600 dark:text-blue-400">15 km</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400">Max Geodesic Range</div>
         </div>
       </div>
 
