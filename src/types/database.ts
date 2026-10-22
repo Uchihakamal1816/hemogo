@@ -29,6 +29,15 @@ export interface DonorProfile {
   bloodGroup: BloodGroup;
   pinCode: string;
   email?: string;
+  alternatePhone?: string;
+  city?: string;
+  notificationPreferences?: {
+    sms: boolean;
+    whatsapp: boolean;
+    push: boolean;
+  };
+  preferredRadiusKm?: number;
+  verificationDocumentType?: 'Aadhaar Card' | 'Driving License' | 'Donor Card';
   availability: DonorAvailability;
   verificationStatus: boolean;
   premiumStatus: boolean;
@@ -109,8 +118,14 @@ export interface MatchRecord {
 export interface SubscriptionRecord {
   subscriptionId: string;
   userId: string;
+  invoiceNumber?: string;
+  donorName?: string;
+  donorPhone?: string;
+  donorEmail?: string;
   plan: 'hemogo_premium_annual';
   amountPaise: number;
+  baseAmountPaise?: number;
+  gstAmountPaise?: number;
   currency: 'INR';
   startDate: string;
   expiryDate: string;
@@ -120,6 +135,16 @@ export interface SubscriptionRecord {
   razorpayPaymentId?: string;
   razorpaySignature?: string;
   createdAt: string;
+}
+
+export interface DonorSearchAnalytics {
+  donorId: string;
+  totalSearchImpressions: number;
+  priorityRankOneImpressions: number;
+  searchesThisMonth: number;
+  averageResponseTimeMinutes: number;
+  badgeLevel: 'Lifesaver Silver' | 'Lifesaver Gold' | 'Lifesaver Platinum';
+  rankingPercentile: number;
 }
 
 export interface AuditLog {

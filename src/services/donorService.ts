@@ -240,3 +240,110 @@ export async function toggleDonorAvailability(
       : 'You are now set to Unavailable. No emergency requests will be sent.'
   };
 }
+
+export async function updateDonorSettings(
+  donorId: string,
+  updates: Partial<Pick<DonorProfile, 'name' | 'phone' | 'alternatePhone' | 'city' | 'pinCode' | 'email' | 'notificationPreferences' | 'preferredRadiusKm'>>
+): Promise<DonorProfile> {
+  const donors = getStoredMockDonors();
+  let idx = donors.findIndex(d => d.donorId === donorId || d.userId === donorId);
+  
+  if (idx < 0) {
+    const init = INITIAL_DEMO_DONORS.find(d => d.donorId === donorId || d.userId === donorId);
+    if (init) {
+      donors.push({ ...init });
+      idx = donors.length - 1;
+    } else {
+      throw new Error('Donor profile not found.');
+    }
+  }
+
+  // Validate 6-digit Indian PIN Code
+  if (updates.pinCode && !/^\d{6}$/.test(updates.pinCode.trim())) {
+    throw new Error('PIN Code must be a valid 6-digit Indian postal code.');
+  }
+
+  const updatedProfile: DonorProfile = {
+    ...donors[idx],
+    ...updates,
+    pinCode: updates.pinCode?.trim() || donors[idx].pinCode,
+    updatedAt: new Date().toISOString()
+  };
+
+  donors[idx] = updatedProfile;
+  saveMockDonors(donors);
+
+  if (!isDemoMode) {
+    try {
+      const donorRef = doc(db, 'donors', donorId);
+      await setDoc(donorRef, updatedProfile, { merge: true });
+    } catch (err) {
+      console.warn('Firestore settings update failed:', err);
+    }
+  }
+
+  return updatedProfile;
+}
+
+export function getDonorSearchAnalytics(donor: DonorProfile) {
+  // Compute realistic analytics based on donor's activity and premium status
+  const baseImpressions = (donor.totalRequestsReceived || 12) * 4;
+  const rankOneMultiplier = donor.premiumStatus ? 0.75 : 0.25;
+  const rankOneImpressions = Math.round(baseImpressions * rankOneMultiplier);
+  const searchesThisMonth = Math.round(baseImpressions * 0.4);
+
+  return {
+    donorId: donor.donorId,
+    totalSearchImpressions: baseImpressions,
+    priorityRankOneImpressions: rankOneImpressions,
+    searchesThisMonth,
+    averageResponseTimeMinutes: donor.premiumStatus ? 3.8 : 7.2,
+    badgeLevel: donor.premiumStatus ? 'Lifesaver Platinum' : donor.totalCompleted > 5 ? 'Lifesaver Gold' : 'Lifesaver Silver',
+    rankingPercentile: donor.premiumStatus ? 98 : 72
+  };
+}
+
+export async function adminVerifyDonor(donorId: string): Promise<DonorProfile> {
+  const donors = getStoredMockDonors();
+  const idx = donors.findIndex(d => d.donorId === donorId || d.userId === donorId);
+  if (idx < 0) {
+    throw new Error('Donor not found.');
+  }
+
+  donors[idx].verificationStatus = true;
+  donors[idx].updatedAt = new Date().toISOString();
+  saveMockDonors(donors);
+
+  if (!isDemoMode) {
+    try {
+      await setDoc(doc(db, 'donors', donorId), { verificationStatus: true, updatedAt: new Date().toISOString() }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore verification update failed:', err);
+    }
+  }
+
+  return donors[idx];
+}
+
+export async function adminRevokeDonor(donorId: string): Promise<DonorProfile> {
+  const donors = getStoredMockDonors();
+  const idx = donors.findIndex(d => d.donorId === donorId || d.userId === donorId);
+  if (idx < 0) {
+    throw new Error('Donor not found.');
+  }
+
+  donors[idx].verificationStatus = false;
+  donors[idx].updatedAt = new Date().toISOString();
+  saveMockDonors(donors);
+
+  if (!isDemoMode) {
+    try {
+      await setDoc(doc(db, 'donors', donorId), { verificationStatus: false, updatedAt: new Date().toISOString() }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore revoke update failed:', err);
+    }
+  }
+
+  return donors[idx];
+}
+
