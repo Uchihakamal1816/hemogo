@@ -63,6 +63,11 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
     fillLight.position.set(-8, -5, -4);
     scene.add(fillLight);
 
+    // Back / Underside Light for Full 360-Degree Illumination as cells revolve
+    const backFillLight = new THREE.DirectionalLight(isLight ? 0xff7788 : 0xcc1122, isLight ? 1.6 : 2.0);
+    backFillLight.position.set(0, -6, -8);
+    scene.add(backFillLight);
+
     // Secondary Specular / Rim Light
     const rimLight = new THREE.PointLight(isLight ? 0xff6666 : 0xff3b5c, isLight ? 2.4 : 3.0, 45);
     rimLight.position.set(0, 4, -4);
@@ -71,6 +76,9 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
     // Biconcave Erythrocyte Parametric Geometry Generator
     // Based on Evans-Fung biconcave discoid equation:
     // z(r) = 0.5 * D * sqrt(1 - (2r/D)^2) * (c0 + c1*(2r/D)^2 + c2*(2r/D)^4)
+    // Constructs a true, watertight, solid, closed 3D biconcave cross-section profile:
+    // from (r = 0.001, z = -z(0)) along bottom curve to rounded rim at (r = R, z = 0),
+    // and back along top curve to (r = 0.001, z = +z(0)).
     const createErythrocyteGeometry = (radius: number, radialSegs = 64, tubularSegs = 64): THREE.BufferGeometry => {
       const points: THREE.Vector2[] = [];
       const D = radius * 2;
@@ -78,12 +86,22 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
       const c1 = 2.003;
       const c2 = -1.122;
 
-      for (let i = 0; i <= radialSegs; i++) {
-        const r = (i / radialSegs) * radius;
+      const calcZ = (r: number) => {
         const normR = (2 * r) / D;
         const term = Math.max(0, 1 - normR * normR);
-        const z = 0.5 * D * Math.sqrt(term) * (c0 + c1 * Math.pow(normR, 2) + c2 * Math.pow(normR, 4));
-        points.push(new THREE.Vector2(Math.max(0.015, r), z * 0.46));
+        return 0.5 * D * Math.sqrt(term) * (c0 + c1 * Math.pow(normR, 2) + c2 * Math.pow(normR, 4)) * 0.46;
+      };
+
+      // 1. Bottom concave surface: from center axis (r = 0.001, z = -z(0)) outward to rounded rim (r = radius, z = 0)
+      for (let i = 0; i <= radialSegs; i++) {
+        const r = 0.001 + (i / radialSegs) * (radius - 0.001);
+        points.push(new THREE.Vector2(r, -calcZ(r)));
+      }
+
+      // 2. Top concave surface: from rounded rim (r = radius, z = 0) inward back to center axis (r = 0.001, z = +z(0))
+      for (let i = radialSegs - 1; i >= 0; i--) {
+        const r = 0.001 + (i / radialSegs) * (radius - 0.001);
+        points.push(new THREE.Vector2(r, calcZ(r)));
       }
 
       const lathe = new THREE.LatheGeometry(points, tubularSegs);
@@ -104,7 +122,8 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
       transmission: isLight ? 0.15 : 0.2,
       ior: 1.42,
       sheen: 0.5,
-      sheenColor: 0xff6677
+      sheenColor: 0xff6677,
+      side: THREE.DoubleSide
     });
 
     // Secondary Material with intense gloss for foreground cells
@@ -119,7 +138,8 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
       transmission: isLight ? 0.18 : 0.22,
       ior: 1.45,
       sheen: 0.6,
-      sheenColor: 0xff7b8b
+      sheenColor: 0xff7b8b,
+      side: THREE.DoubleSide
     });
 
     const rootGroup = new THREE.Group();
@@ -166,8 +186,11 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
       { r: 1.1, pos: [-1.8, 3.8, -3.5], rot: [-0.4, 0.2, 0.6], mat: cellMaterial, depth: 0.45 }
     ];
 
+    const cellGeometries: THREE.BufferGeometry[] = [];
+
     cellsSetup.forEach((cfg, idx) => {
       const geom = createErythrocyteGeometry(cfg.r);
+      cellGeometries.push(geom);
       const mesh = new THREE.Mesh(geom, cfg.mat);
       mesh.position.set(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
       mesh.rotation.set(cfg.rot[0], cfg.rot[1], cfg.rot[2]);
@@ -229,7 +252,8 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
       clearcoatRoughness: 0.06,
       reflectivity: 0.98,
       transmission: 0.15,
-      ior: 1.5
+      ior: 1.5,
+      side: THREE.DoubleSide
     });
 
     const flowArc = new THREE.Mesh(arcGeometry, arcMaterial);
@@ -380,6 +404,7 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
         container.removeChild(renderer.domElement);
       }
       renderer.dispose();
+      cellGeometries.forEach((g) => g.dispose());
       cellMaterial.dispose();
       cellMaterialGloss.dispose();
       arcMaterial.dispose();

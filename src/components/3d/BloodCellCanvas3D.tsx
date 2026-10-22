@@ -64,28 +64,40 @@ export const BloodCellCanvas3D: React.FC<BloodCellCanvas3DProps> = ({
     rimLight.position.set(0, 5, -8);
     scene.add(rimLight);
 
-    // Function to generate mathematically accurate biconcave red blood cell geometry
-    const createErythrocyteGeometry = (radius: number): THREE.BufferGeometry => {
-      // Create radial curve using erythrocyte thickness formula:
-      // z(r) = D * sqrt(1 - (2r/D)^2) * (c0 + c1*(2r/D)^2 + c2*(2r/D)^4)
+    const backLight = new THREE.DirectionalLight(0xff3344, 2.0);
+    backLight.position.set(0, -6, -6);
+    scene.add(backLight);
+
+    // Function to generate mathematically accurate, watertight, solid biconcave red blood cell geometry
+    const createErythrocyteGeometry = (radius: number, radialSegs = 64, tubularSegs = 64): THREE.BufferGeometry => {
+      // Based on Evans-Fung biconcave discoid equation:
+      // z(r) = 0.5 * D * sqrt(1 - (2r/D)^2) * (c0 + c1*(2r/D)^2 + c2*(2r/D)^4)
       const points: THREE.Vector2[] = [];
-      const segments = 32;
       const D = radius * 2;
       const c0 = 0.207;
       const c1 = 2.003;
       const c2 = -1.122;
 
-      // Profile from center (r=0) to edge (r=radius) and back
-      for (let i = 0; i <= segments; i++) {
-        const r = (i / segments) * radius;
+      const calcZ = (r: number) => {
         const normR = (2 * r) / D;
         const term = Math.max(0, 1 - normR * normR);
-        const z = 0.5 * D * Math.sqrt(term) * (c0 + c1 * Math.pow(normR, 2) + c2 * Math.pow(normR, 4));
-        points.push(new THREE.Vector2(Math.max(0.01, r), z * 0.45));
+        return 0.5 * D * Math.sqrt(term) * (c0 + c1 * Math.pow(normR, 2) + c2 * Math.pow(normR, 4)) * 0.46;
+      };
+
+      // 1. Bottom concave surface: from center axis (r = 0.001, z = -z(0)) outward to rounded rim (r = radius, z = 0)
+      for (let i = 0; i <= radialSegs; i++) {
+        const r = 0.001 + (i / radialSegs) * (radius - 0.001);
+        points.push(new THREE.Vector2(r, -calcZ(r)));
       }
 
-      // Lathe curve around y-axis to form biconcave disc
-      const lathe = new THREE.LatheGeometry(points, 48);
+      // 2. Top concave surface: from rounded rim (r = radius, z = 0) inward back to center axis (r = 0.001, z = +z(0))
+      for (let i = radialSegs - 1; i >= 0; i--) {
+        const r = 0.001 + (i / radialSegs) * (radius - 0.001);
+        points.push(new THREE.Vector2(r, calcZ(r)));
+      }
+
+      // Lathe curve around y-axis to form complete biconcave disc
+      const lathe = new THREE.LatheGeometry(points, tubularSegs);
       lathe.center();
       lathe.computeVertexNormals();
       return lathe;
@@ -99,7 +111,8 @@ export const BloodCellCanvas3D: React.FC<BloodCellCanvas3DProps> = ({
       metalness: 0.1,
       clearcoat: 0.65,
       clearcoatRoughness: 0.2,
-      reflectivity: 0.8
+      reflectivity: 0.8,
+      side: THREE.DoubleSide
     });
 
     // Secondary Material for variety
@@ -109,7 +122,8 @@ export const BloodCellCanvas3D: React.FC<BloodCellCanvas3DProps> = ({
       roughness: 0.22,
       metalness: 0.08,
       clearcoat: 0.85,
-      clearcoatRoughness: 0.15
+      clearcoatRoughness: 0.15,
+      side: THREE.DoubleSide
     });
 
     // Group for all rotating blood cells
@@ -144,8 +158,11 @@ export const BloodCellCanvas3D: React.FC<BloodCellCanvas3DProps> = ({
       { r: 0.7, pos: [1.2, -3.2, -4], rot: [0.2, 0.9, -0.4], mat: cellMaterialGloss }
     ];
 
+    const floatingGeometries: THREE.BufferGeometry[] = [];
+
     cellConfigs.forEach((cfg, idx) => {
       const geom = createErythrocyteGeometry(cfg.r);
+      floatingGeometries.push(geom);
       const mesh = new THREE.Mesh(geom, cfg.mat);
       mesh.position.set(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
       mesh.rotation.set(cfg.rot[0], cfg.rot[1], cfg.rot[2]);
@@ -262,6 +279,7 @@ export const BloodCellCanvas3D: React.FC<BloodCellCanvas3DProps> = ({
       }
       renderer.dispose();
       mainGeometry.dispose();
+      floatingGeometries.forEach((g) => g.dispose());
       cellMaterial.dispose();
       cellMaterialGloss.dispose();
       particleGeometry.dispose();
