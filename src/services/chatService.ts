@@ -1,44 +1,8 @@
 import type { ChatMessage, UserProfile } from '../types/database';
 
-const MOCK_CHATS_KEY = 'hemogo_mock_chats_v1';
+const MOCK_CHATS_KEY = 'hemogo_mock_chats_v3';
 
-export const INITIAL_DEMO_CHATS: Record<string, ChatMessage[]> = {
-  'HG10245': [
-    {
-      messageId: 'msg_sys_001',
-      requestId: 'HG10245',
-      matchId: 'match_002_accepted',
-      senderId: 'system',
-      senderRole: 'system',
-      senderName: 'HemoGo Security',
-      text: '🔒 Emergency Match Confirmed. Phone numbers and private in-app chat are now unlocked to coordinate hospital arrival.',
-      createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-      read: true
-    },
-    {
-      messageId: 'msg_req_001',
-      requestId: 'HG10245',
-      matchId: 'match_002_accepted',
-      senderId: 'demo_req_001',
-      senderRole: 'requester',
-      senderName: 'Anil Kumar (Requester)',
-      text: 'Hello Vikramaditya! Thank you so much for accepting. We are at Care Hospital, 2nd Floor ICU Trauma.',
-      createdAt: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
-      read: true
-    },
-    {
-      messageId: 'msg_don_001',
-      requestId: 'HG10245',
-      matchId: 'match_002_accepted',
-      senderId: 'demo_donor_003',
-      senderRole: 'donor',
-      senderName: 'Vikramaditya Roy (Donor)',
-      text: 'Hi Anil, I am on my way. GPS says I will reach the blood bank in around 10 minutes.',
-      createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-      read: true
-    }
-  ]
-};
+export const INITIAL_DEMO_CHATS: Record<string, ChatMessage[]> = {};
 
 export function getStoredChatMessages(requestId: string): ChatMessage[] {
   const saved = localStorage.getItem(MOCK_CHATS_KEY);
@@ -68,6 +32,12 @@ export function getStoredChatMessages(requestId: string): ChatMessage[] {
   } catch {
     return INITIAL_DEMO_CHATS[requestId] || [];
   }
+}
+
+export function clearChatStorage(): void {
+  localStorage.removeItem(MOCK_CHATS_KEY);
+  localStorage.removeItem('hemogo_mock_chats_v1');
+  localStorage.removeItem('hemogo_mock_chats_v2');
 }
 
 export function sendChatMessage(data: {

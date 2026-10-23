@@ -58,7 +58,16 @@ export const PastEmergenciesModal: React.FC<PastEmergenciesModalProps> = ({
 
         {/* Records List */}
         <div className="space-y-4">
-          {historyList.map((record) => (
+          {historyList.length === 0 ? (
+            <div className="p-8 text-center rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+              <Clock className="w-8 h-8 text-slate-500 mx-auto" />
+              <p className="text-sm font-bold text-slate-300">No Past Emergency Requests</p>
+              <p className="text-xs text-slate-500">
+                You have not raised any previous requests yet. All new emergency requests will be logged here.
+              </p>
+            </div>
+          ) : (
+            historyList.map((record) => (
             <div
               key={record.historyId}
               className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4 hover:border-slate-700 transition-all"
@@ -122,7 +131,8 @@ export const PastEmergenciesModal: React.FC<PastEmergenciesModalProps> = ({
               </div>
 
             </div>
-          ))}
+          ))
+          )}
         </div>
 
       </div>

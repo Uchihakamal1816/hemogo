@@ -6,7 +6,7 @@ import type {
   DonorAvailability 
 } from '../types/database';
 
-const MOCK_DONORS_KEY = 'hemogo_mock_donors_v2';
+const MOCK_DONORS_KEY = 'hemogo_mock_donors_v3';
 
 export const INITIAL_DEMO_DONORS: DonorProfile[] = [
   {
@@ -21,13 +21,13 @@ export const INITIAL_DEMO_DONORS: DonorProfile[] = [
     verificationStatus: true,
     premiumStatus: true,
     premiumExpiry: new Date(Date.now() + 300 * 24 * 60 * 60 * 1000).toISOString(),
-    lastDonationDate: new Date(Date.now() - 110 * 24 * 60 * 60 * 1000).toISOString(),
+    lastDonationDate: null,
     cooldownUntil: null,
-    totalRequestsReceived: 12,
-    totalAccepted: 8,
-    totalRejected: 1,
-    totalCompleted: 6,
-    createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+    totalRequestsReceived: 0,
+    totalAccepted: 0,
+    totalRejected: 0,
+    totalCompleted: 0,
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
@@ -38,16 +38,16 @@ export const INITIAL_DEMO_DONORS: DonorProfile[] = [
     bloodGroup: 'A+',
     pinCode: '530016',
     email: 'pooja.v@example.com',
-    availability: 'unavailable',
+    availability: 'available',
     verificationStatus: true,
     premiumStatus: false,
-    lastDonationDate: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
-    cooldownUntil: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000).toISOString(),
-    totalRequestsReceived: 6,
-    totalAccepted: 3,
+    lastDonationDate: null,
+    cooldownUntil: null,
+    totalRequestsReceived: 0,
+    totalAccepted: 0,
     totalRejected: 0,
-    totalCompleted: 3,
-    createdAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+    totalCompleted: 0,
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
@@ -62,13 +62,13 @@ export const INITIAL_DEMO_DONORS: DonorProfile[] = [
     verificationStatus: true,
     premiumStatus: true,
     premiumExpiry: new Date(Date.now() + 200 * 24 * 60 * 60 * 1000).toISOString(),
-    lastDonationDate: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
+    lastDonationDate: null,
     cooldownUntil: null,
-    totalRequestsReceived: 18,
-    totalAccepted: 14,
-    totalRejected: 2,
-    totalCompleted: 12,
-    createdAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+    totalRequestsReceived: 0,
+    totalAccepted: 0,
+    totalRejected: 0,
+    totalCompleted: 0,
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
@@ -82,16 +82,21 @@ export const INITIAL_DEMO_DONORS: DonorProfile[] = [
     availability: 'available',
     verificationStatus: true,
     premiumStatus: false,
-    lastDonationDate: new Date(Date.now() - 95 * 24 * 60 * 60 * 1000).toISOString(),
+    lastDonationDate: null,
     cooldownUntil: null,
-    totalRequestsReceived: 9,
-    totalAccepted: 5,
-    totalRejected: 1,
-    totalCompleted: 5,
-    createdAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(),
+    totalRequestsReceived: 0,
+    totalAccepted: 0,
+    totalRejected: 0,
+    totalCompleted: 0,
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   }
 ];
+
+export function clearDonorStorage(): void {
+  localStorage.removeItem(MOCK_DONORS_KEY);
+  localStorage.removeItem('hemogo_mock_donors_v2');
+}
 
 export function getStoredMockDonors(): DonorProfile[] {
   const saved = localStorage.getItem(MOCK_DONORS_KEY);

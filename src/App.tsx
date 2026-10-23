@@ -32,18 +32,31 @@ export const App: React.FC = () => {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   useEffect(() => {
+    // One-time auto-wipe of legacy demo history for brand new experience
+    const CLEAN_STATE_KEY = 'hemogo_clean_state_v3';
+    if (!localStorage.getItem(CLEAN_STATE_KEY)) {
+      localStorage.removeItem('hemogo_past_emergencies');
+      localStorage.removeItem('hemogo_donation_records');
+      localStorage.removeItem('hemogo_mock_chats_v1');
+      localStorage.removeItem('hemogo_mock_requests_v2');
+      localStorage.removeItem('hemogo_mock_matches_v2');
+      localStorage.removeItem('hemogo_mock_donors_v2');
+      localStorage.removeItem('hemogo_demo_user');
+      localStorage.setItem(CLEAN_STATE_KEY, 'true');
+    }
+
     // Check deep-link query parameters on launch
     const deepLink = parseDeepLinkRoute();
     if (deepLink.tab) {
       setActiveTab(deepLink.tab);
     }
 
+    // Load active session user if logged in, otherwise stay as clean new visitor
     const savedUser = getCurrentSessionUser();
     if (savedUser) {
       setCurrentUser(savedUser);
     } else {
-      const defaultUser = setDemoUserPreset('donor_eligible');
-      setCurrentUser(defaultUser);
+      setCurrentUser(null);
     }
   }, []);
 
@@ -55,6 +68,16 @@ export const App: React.FC = () => {
   const handleSelectPreset = (key: keyof typeof DEMO_PRESET_USERS) => {
     const user = setDemoUserPreset(key);
     setCurrentUser(user);
+  };
+
+  const handleResetAllData = () => {
+    if (confirm('Are you sure you want to clear all data and start completely fresh?')) {
+      localStorage.clear();
+      localStorage.setItem('hemogo_clean_state_v3', 'true');
+      setCurrentUser(null);
+      setActiveTab('home');
+      window.location.reload();
+    }
   };
 
   return (
@@ -137,13 +160,21 @@ export const App: React.FC = () => {
             <span>— Emergency Blood Connection Platform</span>
           </div>
 
-          <div className="flex items-center gap-4 text-slate-400">
+          <div className="flex items-center gap-4 text-slate-400 flex-wrap">
             <span className="flex items-center gap-1 text-red-400">
               <Phone className="w-3.5 h-3.5" />
               24/7 Emergency Line: 108 / 104
             </span>
             <span>•</span>
             <span>Privacy Guarded • Firebase & Razorpay Powered</span>
+            <span>•</span>
+            <button 
+              onClick={handleResetAllData}
+              className="hover:text-red-400 transition-colors cursor-pointer text-[11px] underline"
+              title="Clear all stored data and reset app to brand new"
+            >
+              Reset App Data
+            </button>
           </div>
         </div>
       </footer>

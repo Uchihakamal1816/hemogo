@@ -7,75 +7,19 @@ import type {
 } from '../types/database';
 import { getStoredMockDonors } from './donorService';
 
-const MOCK_REQUESTS_KEY = 'hemogo_mock_requests_v2';
-const MOCK_MATCHES_KEY = 'hemogo_mock_matches_v2';
+const MOCK_REQUESTS_KEY = 'hemogo_mock_requests_v3';
+const MOCK_MATCHES_KEY = 'hemogo_mock_matches_v3';
 
-export const INITIAL_DEMO_REQUESTS: BloodRequest[] = [
-  {
-    requestId: 'HG10245',
-    requesterId: 'demo_req_001',
-    patientName: 'Kavitha Ramachandran (Age 32)',
-    requesterPhone: '+91 99887 76655',
-    bloodGroup: 'O+',
-    hospitalName: 'Care Hospital, Waltair Main Rd',
-    hospitalPinCode: '530016',
-    unitsRequired: 2,
-    urgency: 'critical',
-    notes: 'Emergency cesarean delivery with severe hemorrhage. Urgent blood units needed.',
-    status: 'DONORS_NOTIFIED',
-    notifiedDonorsCount: 8,
-    acceptedDonorsCount: 1,
-    rejectedDonorsCount: 0,
-    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-  }
-];
+export const INITIAL_DEMO_REQUESTS: BloodRequest[] = [];
 
-export const INITIAL_DEMO_MATCHES: MatchRecord[] = [
-  {
-    matchId: 'match_001_pending',
-    requestId: 'HG10245',
-    donorId: 'demo_donor_001',
-    donorName: 'Rahul Sharma',
-    donorPhone: '+91 98765 43210',
-    donorBloodGroup: 'O+',
-    donorPinCode: '530016',
-    isPremiumDonor: true,
-    priorityScore: 100,
-    locationMatch: 'SAME_PIN',
-    notificationStatus: 'DELIVERED',
-    response: 'PENDING',
-    respondedAt: null,
-    eligibilityScreening: null,
-    createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString()
-  },
-  {
-    matchId: 'match_002_accepted',
-    requestId: 'HG10245',
-    donorId: 'demo_donor_003',
-    donorName: 'Vikramaditya Roy',
-    donorPhone: '+91 97766 55443',
-    donorBloodGroup: 'O-',
-    donorPinCode: '530013',
-    isPremiumDonor: true,
-    priorityScore: 80,
-    locationMatch: 'NEIGHBOR_PIN',
-    notificationStatus: 'DELIVERED',
-    response: 'ACCEPTED',
-    respondedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    eligibilityScreening: {
-      feelingWell: true,
-      recentDonation: false,
-      hasInfectionSymptoms: false,
-      takingMedications: false,
-      previousDecline: false,
-      willingForBloodBankScreening: true,
-      confirmedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString()
-    },
-    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString()
-  }
-];
+export const INITIAL_DEMO_MATCHES: MatchRecord[] = [];
+
+export function clearEmergencyStorage(): void {
+  localStorage.removeItem(MOCK_REQUESTS_KEY);
+  localStorage.removeItem(MOCK_MATCHES_KEY);
+  localStorage.removeItem('hemogo_mock_requests_v2');
+  localStorage.removeItem('hemogo_mock_matches_v2');
+}
 
 export function getStoredRequests(): BloodRequest[] {
   const saved = localStorage.getItem(MOCK_REQUESTS_KEY);

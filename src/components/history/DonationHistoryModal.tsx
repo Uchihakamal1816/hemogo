@@ -118,7 +118,16 @@ export const DonationHistoryModal: React.FC<DonationHistoryModalProps> = ({
 
         {/* Records List */}
         <div className="space-y-4">
-          {records.map((rec) => (
+          {records.length === 0 ? (
+            <div className="p-8 text-center rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+              <Award className="w-8 h-8 text-slate-500 mx-auto" />
+              <p className="text-sm font-bold text-slate-300">No Donation Records Yet</p>
+              <p className="text-xs text-slate-500">
+                You have not completed any emergency donations yet. Once a hospital blood bank registers and verifies your donation, your digital certificates will appear here.
+              </p>
+            </div>
+          ) : (
+            records.map((rec) => (
             <div
               key={rec.donationId}
               className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-slate-700 transition-all"
@@ -153,7 +162,8 @@ export const DonationHistoryModal: React.FC<DonationHistoryModalProps> = ({
                 <span>View Certificate</span>
               </button>
             </div>
-          ))}
+          ))
+          )}
         </div>
 
       </div>
