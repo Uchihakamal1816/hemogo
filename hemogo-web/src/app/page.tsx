@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Heart, Shield, Droplet, ArrowRight } from "lucide-react";
+import { Activity, Heart, Shield, Droplet } from "lucide-react";
 
 export default function Home() {
   return (
