@@ -36,5 +36,10 @@ service cloud.firestore {
       // Requesters can only read matches for their request, AND only if the donor accepted.
       allow read: if isAuthenticated() && resource.data.requesterId == request.auth.uid && resource.data.status == 'ACCEPTED';
     }
+
+    // 5. Notifications Collection
+    match /notifications/{notificationId} {
+      allow read, update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
   }
 }

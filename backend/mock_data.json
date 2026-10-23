@@ -1,0 +1,53 @@
+{
+  "donors": [
+    {
+      "donorId": "donor1",
+      "name": "Alice Smith",
+      "bloodGroup": "O+",
+      "pinCode": "12345",
+      "availability": true,
+      "premiumStatus": true
+    },
+    {
+      "donorId": "donor2",
+      "name": "Bob Jones",
+      "bloodGroup": "O+",
+      "pinCode": "12345",
+      "availability": true,
+      "premiumStatus": false
+    },
+    {
+      "donorId": "donor3",
+      "name": "Charlie Brown",
+      "bloodGroup": "O+",
+      "pinCode": "12346",
+      "availability": true,
+      "premiumStatus": true
+    },
+    {
+      "donorId": "donor4",
+      "name": "Diana Prince",
+      "bloodGroup": "O+",
+      "pinCode": "12346",
+      "availability": true,
+      "premiumStatus": false
+    },
+    {
+      "donorId": "donor5",
+      "name": "Eve Adams",
+      "bloodGroup": "A+",
+      "pinCode": "12345",
+      "availability": true,
+      "premiumStatus": false
+    }
+  ],
+  "bloodRequests": [
+    {
+      "requestId": "req1",
+      "requesterId": "reqUser1",
+      "bloodGroup": "O+",
+      "hospitalPinCode": "12345",
+      "unitsNeeded": 2
+    }
+  ]
+}

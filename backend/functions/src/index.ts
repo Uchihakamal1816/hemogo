@@ -44,8 +44,9 @@ export const onBloodRequestCreated = functions.firestore
         // 2. Location Priority
         if (donor.pinCode === hospitalPinCode) {
           priorityScore += 50;
-        } else {
-          // Implement logic for neighboring PINs
+        } else if (Math.abs(parseInt(donor.pinCode) - parseInt(hospitalPinCode)) <= 5) {
+          // Mock neighboring PINs logic: numerical difference is small
+          priorityScore += 25;
         }
 
         // 3. Premium Priority
@@ -78,8 +79,21 @@ export const onBloodRequestCreated = functions.firestore
           status: "NOTIFIED", // OPEN, NOTIFIED, ACCEPTED, REJECTED
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        // Implement Push Notification trigger via FCM here
+        // MOCK: In a real app we'd use admin.messaging().sendToDevice(...)
+        console.log(`[MOCK FCM] Sending push notification to donor ${match.donorId} for match ${matchRef.id}`);
         
-        // TODO: Implement Push Notification trigger via FCM here
+        // Also create a notification document
+        const notificationRef = db.collection("notifications").doc();
+        batch.set(notificationRef, {
+          userId: match.donorId,
+          title: "Urgent Blood Request",
+          body: `An urgent request for ${requiredBloodGroup} blood near your location.`,
+          matchId: matchRef.id,
+          requestId: requestId,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
       });
 
       await batch.commit();
@@ -88,4 +102,53 @@ export const onBloodRequestCreated = functions.firestore
     } catch (error) {
       console.error("Error running matching engine:", error);
     }
+  });
+
+/**
+ * Cloud Function triggered when a match document is updated.
+ * Handles the Accept/Reject lifecycle and secure contact sharing.
+ */
+export const onMatchStatusUpdated = functions.firestore
+  .document("matches/{matchId}")
+  .onUpdate(async (change, context) => {
+    const newValue = change.after.data();
+    const previousValue = change.before.data();
+    const matchId = context.params.matchId;
+
+    if (previousValue.status === newValue.status) {
+      return null;
+    }
+
+    console.log(`Match ${matchId} status changed from ${previousValue.status} to ${newValue.status}`);
+
+    if (newValue.status === "ACCEPTED") {
+      try {
+        // Fetch donor details securely
+        const donorSnapshot = await db.collection("donors").doc(newValue.donorId).get();
+        if (!donorSnapshot.exists) return;
+        const donorData = donorSnapshot.data();
+
+        // 1. Notify the requester that a donor accepted
+        console.log(`[MOCK FCM] Sending push notification to requester ${newValue.requesterId}`);
+        await db.collection("notifications").add({
+          userId: newValue.requesterId,
+          title: "Donor Found!",
+          body: `${donorData?.name || 'A donor'} has accepted your blood request.`,
+          matchId: matchId,
+          requestId: newValue.requestId,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // 2. The match is already ACCEPTED, so the requester can now read the match.
+        // The requester will pull contact info either from the match (if duplicated) 
+        // or through a separate secure mechanism. For now, the rule allows read.
+        console.log(`Secure contact sharing enabled for match ${matchId}.`);
+
+      } catch (error) {
+        console.error("Error processing accepted match:", error);
+      }
+    }
+    
+    return null;
   });
