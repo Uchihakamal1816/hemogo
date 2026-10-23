@@ -152,12 +152,14 @@ export async function registerDonorProfile(profile: DonorProfile): Promise<Donor
 export async function getDonorProfile(donorId: string): Promise<DonorProfile | null> {
   if (!isDemoMode) {
     try {
-      const snap = await getDoc(doc(db, 'donors', donorId));
-      if (snap.exists()) {
+      const fetchPromise = getDoc(doc(db, 'donors', donorId));
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 1500));
+      const snap = await Promise.race([fetchPromise, timeoutPromise]);
+      if (snap && snap.exists()) {
         return snap.data() as DonorProfile;
       }
     } catch (err) {
-      console.warn('Firestore read failed, checking local mock state:', err);
+      console.warn('Firestore read failed or timed out, checking local mock state:', err);
     }
   }
 

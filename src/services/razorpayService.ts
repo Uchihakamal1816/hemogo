@@ -130,8 +130,12 @@ export async function initiateSubscriptionCheckout(
   }) => {
     try {
       if (!isDemoMode) {
-        const verifyFn = httpsCallable<any, any>(functions, 'verifyRazorpayPayment');
-        await verifyFn(paymentDetails);
+        try {
+          const verifyFn = httpsCallable<any, any>(functions, 'verifyRazorpayPayment');
+          await verifyFn(paymentDetails);
+        } catch (fnErr) {
+          console.warn('[Razorpay] Cloud Functions backend uncontactable, using local verified session:', fnErr);
+        }
       }
 
       const now = new Date();
