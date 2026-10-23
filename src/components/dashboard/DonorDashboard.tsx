@@ -15,7 +15,8 @@ import {
   X,
   AlertTriangle,
   MessageSquare,
-  Award
+  Award,
+  Sliders
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { 
@@ -36,6 +37,11 @@ import {
 } from '../../services/emergencyService';
 import { EmergencyChatModal } from '../chat/EmergencyChatModal';
 import { DonationHistoryModal } from '../history/DonationHistoryModal';
+import { DonorSettingsModal } from './DonorSettingsModal';
+import { PremiumAnalyticsWidget } from './PremiumAnalyticsWidget';
+import { PremiumReceiptModal } from '../premium/PremiumReceiptModal';
+import { getUserSubscription } from '../../services/razorpayService';
+import type { SubscriptionRecord } from '../../types/database';
 
 interface DonorDashboardProps {
   currentUser: UserProfile | null;
@@ -72,6 +78,9 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
 
   const [showChatModal, setShowChatModal] = useState(false);
   const [showDonationHistory, setShowDonationHistory] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
 
   useEffect(() => {
     loadData();
@@ -92,6 +101,8 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         const matches = getPendingMatchesForDonor(profile.donorId || currentUser.userId);
         setPendingMatches(matches);
       }
+      const sub = getUserSubscription(currentUser.userId);
+      setSubscription(sub);
     } catch (err: any) {
       console.error('Error loading donor dashboard:', err);
     } finally {
@@ -340,6 +351,16 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
               <span>•</span>
               <span>Phone: <strong>{displayPhone}</strong></span>
             </p>
+
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="text-xs text-slate-300 hover:text-white font-semibold flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors"
+              >
+                <Sliders className="w-3 h-3 text-red-400" />
+                <span>Profile & Preferences</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -484,37 +505,13 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
           </button>
         </div>
 
-        {/* HemoGo Premium ₹299/yr Card */}
-        <div className="glass-panel p-6 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-slate-900 to-amber-950/20 space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <div className="font-bold text-white text-base flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>HemoGo Premium — ₹299/year</span>
-              </div>
-              {donor.premiumStatus ? (
-                <span className="text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-700 px-2 py-0.5 rounded">
-                  ACTIVE
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
-                  FREE
-                </span>
-              )}
-            </div>
-
-            <p className="text-xs text-slate-300 mt-2">
-              Receive top priority matching during blood emergency dispatches in your PIN area with verified shield recognition.
-            </p>
-          </div>
-
-          <button
-            onClick={onOpenPremium}
-            className="w-full btn-primary !py-2.5 text-xs font-bold bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 border-amber-400"
-          >
-            {donor.premiumStatus ? 'Manage Membership' : 'Upgrade to Premium (₹299/yr)'}
-          </button>
-        </div>
+        {/* HemoGo Premium Analytics & Receipt Card */}
+        <PremiumAnalyticsWidget
+          donor={donor}
+          subscription={subscription}
+          onOpenReceipt={() => setShowReceiptModal(true)}
+          onOpenUpgradeModal={onOpenPremium}
+        />
 
       </div>
 
@@ -641,6 +638,23 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         donorId={donor.donorId || currentUser.userId}
         donorName={displayName}
         onClose={() => setShowDonationHistory(false)}
+      />
+
+      {/* Donor Profile & Alert Settings Modal */}
+      <DonorSettingsModal
+        isOpen={showSettingsModal}
+        donor={donor}
+        onClose={() => setShowSettingsModal(false)}
+        onProfileUpdated={(updated) => {
+          setDonor(updated);
+        }}
+      />
+
+      {/* HemoGo Premium GST Tax Invoice Receipt Modal */}
+      <PremiumReceiptModal
+        isOpen={showReceiptModal}
+        subscription={subscription}
+        onClose={() => setShowReceiptModal(false)}
       />
 
     </div>

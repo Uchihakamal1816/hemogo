@@ -1,6 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions, isDemoMode } from '../config/firebase';
-import type { UserProfile } from '../types/database';
+import type { UserProfile, SubscriptionRecord } from '../types/database';
 
 declare global {
   interface Window {
@@ -44,6 +44,76 @@ export function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
+const SUBSCRIPTIONS_KEY = 'hemogo_mock_subscriptions_v1';
+
+export const INITIAL_DEMO_SUBSCRIPTIONS: SubscriptionRecord[] = [
+  {
+    subscriptionId: 'sub_demo_001',
+    invoiceNumber: 'INV-HG-2026-9281',
+    userId: 'demo_donor_001',
+    donorName: 'Rahul Sharma',
+    donorPhone: '+91 98765 43210',
+    donorEmail: 'rahul.sharma@example.com',
+    plan: 'hemogo_premium_annual',
+    amountPaise: 29900,
+    baseAmountPaise: 25339,
+    gstAmountPaise: 4561,
+    currency: 'INR',
+    startDate: new Date(Date.now() - 65 * 24 * 60 * 60 * 1000).toISOString(),
+    expiryDate: new Date(Date.now() + 300 * 24 * 60 * 60 * 1000).toISOString(),
+    paymentStatus: 'paid',
+    paymentProvider: 'Razorpay',
+    razorpayOrderId: 'order_hg_demo_001',
+    razorpayPaymentId: 'pay_live_001_rahul',
+    razorpaySignature: 'sig_mock_rahul_verified',
+    createdAt: new Date(Date.now() - 65 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    subscriptionId: 'sub_demo_003',
+    invoiceNumber: 'INV-HG-2026-7814',
+    userId: 'demo_donor_003',
+    donorName: 'Vikramaditya Roy',
+    donorPhone: '+91 97766 55443',
+    donorEmail: 'vikram.roy@example.com',
+    plan: 'hemogo_premium_annual',
+    amountPaise: 29900,
+    baseAmountPaise: 25339,
+    gstAmountPaise: 4561,
+    currency: 'INR',
+    startDate: new Date(Date.now() - 165 * 24 * 60 * 60 * 1000).toISOString(),
+    expiryDate: new Date(Date.now() + 200 * 24 * 60 * 60 * 1000).toISOString(),
+    paymentStatus: 'paid',
+    paymentProvider: 'Razorpay',
+    razorpayOrderId: 'order_hg_demo_003',
+    razorpayPaymentId: 'pay_live_003_vikram',
+    razorpaySignature: 'sig_mock_vikram_verified',
+    createdAt: new Date(Date.now() - 165 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+export function getStoredSubscriptions(): SubscriptionRecord[] {
+  const saved = localStorage.getItem(SUBSCRIPTIONS_KEY);
+  if (!saved) {
+    localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(INITIAL_DEMO_SUBSCRIPTIONS));
+    return INITIAL_DEMO_SUBSCRIPTIONS;
+  }
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return INITIAL_DEMO_SUBSCRIPTIONS;
+  }
+}
+
+export function saveSubscriptions(subs: SubscriptionRecord[]) {
+  localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subs));
+}
+
+export function getUserSubscription(userId: string): SubscriptionRecord | null {
+  const all = getStoredSubscriptions();
+  const found = all.find(s => s.userId === userId && s.paymentStatus === 'paid');
+  return found || null;
+}
+
 export async function initiateSubscriptionCheckout(
   user: UserProfile,
   onSuccess: (updatedUser: UserProfile) => void,
@@ -66,7 +136,35 @@ export async function initiateSubscriptionCheckout(
 
       const now = new Date();
       const expiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
-      
+      const invoiceNumber = `INV-HG-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      // Record subscription
+      const newSub: SubscriptionRecord = {
+        subscriptionId: `sub_${Date.now()}`,
+        invoiceNumber,
+        userId: user.userId,
+        donorName: user.name,
+        donorPhone: user.phone,
+        donorEmail: user.email || '',
+        plan: 'hemogo_premium_annual',
+        amountPaise: 29900,
+        baseAmountPaise: 25339,
+        gstAmountPaise: 4561,
+        currency: 'INR',
+        startDate: now.toISOString(),
+        expiryDate: expiry,
+        paymentStatus: 'paid',
+        paymentProvider: 'Razorpay',
+        razorpayOrderId: paymentDetails.razorpay_order_id,
+        razorpayPaymentId: paymentDetails.razorpay_payment_id,
+        razorpaySignature: paymentDetails.razorpay_signature,
+        createdAt: now.toISOString()
+      };
+
+      const allSubs = getStoredSubscriptions();
+      allSubs.unshift(newSub);
+      saveSubscriptions(allSubs);
+
       const updatedUser: UserProfile = {
         ...user,
         premiumStatus: true,
