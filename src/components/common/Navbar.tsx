@@ -44,39 +44,39 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme
 }) => {
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 dark:border-slate-800 bg-white/85 dark:bg-slate-950/90 px-4 lg:px-8 py-3 transition-colors">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950/90 px-4 lg:px-8 py-3 transition-colors">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
         
         {/* Brand */}
         <div 
           onClick={() => setActiveTab('home')} 
-          className="flex items-center gap-3 cursor-pointer group"
+          className="flex items-center gap-2 sm:gap-3 cursor-pointer group min-w-0"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center shadow-lg shadow-red-900/40 group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-xl bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center shadow-lg shadow-red-900/40 group-hover:scale-105 transition-transform">
             <HeartHandshake className="w-6 h-6 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-xl tracking-tight text-slate-900 dark:text-white flex items-center gap-0.5">
+              <span className="font-black text-lg sm:text-xl tracking-tight text-slate-900 dark:text-white flex items-center gap-0.5">
                 Hemo<span className="text-red-600 dark:text-red-500">Go</span>
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800/60">
+              <span className="hidden xl:inline text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800/60">
                 24/7 Dispatch
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden xl:block whitespace-nowrap">
               Blood Emergency Connection
             </p>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-100/90 dark:bg-slate-900/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-800 text-xs font-bold transition-colors">
+        <nav className="hidden lg:flex whitespace-nowrap items-center gap-1 bg-slate-100/90 dark:bg-slate-900/90 p-1 rounded-xl border border-slate-200/90 dark:border-slate-800 text-xs font-bold transition-colors">
           <button
             onClick={() => setActiveTab('home')}
             className={`px-3.5 py-2 rounded-lg transition-all ${
               activeTab === 'home'
-                ? 'bg-red-600 text-white shadow-md'
+                ? 'bg-slate-900 text-white shadow-sm dark:bg-red-600 dark:shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
@@ -87,11 +87,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setActiveTab('requester_status')}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
               activeTab === 'requester_status'
-                ? 'bg-red-600 text-white shadow-md'
+                ? 'bg-slate-900 text-white shadow-sm dark:bg-red-600 dark:shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
-            <Radio className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 animate-pulse" />
+            <Radio className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>Live Dispatch Status</span>
           </button>
 
@@ -99,11 +99,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setActiveTab('donor_dashboard')}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
               activeTab === 'donor_dashboard'
-                ? 'bg-red-600 text-white shadow-md'
+                ? 'bg-slate-900 text-white shadow-sm dark:bg-red-600 dark:shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Donor Dashboard</span>
           </button>
 
@@ -112,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('admin')}
               className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 activeTab === 'admin'
-                  ? 'bg-amber-600 text-white shadow-md font-black'
+                  ? 'bg-amber-700 text-white shadow-md font-black'
                   : 'text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300'
               }`}
             >
@@ -123,21 +123,22 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           
           {/* Raise Emergency Blood CTA */}
           <button
             onClick={onOpenCreateEmergency}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-500 transition-all shadow-md shadow-red-600/20"
+            className="inline-flex whitespace-nowrap items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-500 transition-all shadow-md shadow-red-600/20"
           >
-            <Flame className="w-3.5 h-3.5 fill-white" />
-            <span>Request Blood</span>
+            <Flame className="hidden sm:block w-3.5 h-3.5 fill-white" />
+            <span className="sm:hidden">Request</span>
+            <span className="hidden sm:inline">Request Blood</span>
           </button>
 
           {/* Become a Donor CTA */}
           <button
             onClick={onOpenRegisterDonor}
-            className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/80 hover:bg-emerald-600 hover:text-white font-bold text-xs transition-all"
+            className="hidden 2xl:inline-flex whitespace-nowrap items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/80 hover:bg-emerald-600 hover:text-white font-bold text-xs transition-all"
           >
             <Droplet className="w-3.5 h-3.5" />
             <span>Join Donors</span>
@@ -156,7 +157,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={onOpenPremium}
-              className="hidden xl:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-xs hover:brightness-110 transition-all shadow-sm"
+              className="hidden 2xl:inline-flex whitespace-nowrap items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-xs hover:brightness-110 transition-all shadow-sm"
             >
               <Sparkles className="w-3 h-3" />
               <span>Premium ₹299</span>
@@ -197,9 +198,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={onOpenAuth}
-              className="btn-primary text-xs !py-2 !px-3"
+              className="btn-secondary text-xs !py-2 !px-3 whitespace-nowrap"
             >
-              <LogIn className="w-3.5 h-3.5" />
+              <LogIn className="hidden sm:block w-3.5 h-3.5" />
               <span>Sign In</span>
             </button>
           )}
@@ -209,29 +210,29 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Mobile Bar */}
-      <div className="flex md:hidden items-center justify-around mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs font-bold">
+      <div className="flex lg:hidden items-center justify-around mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-800 text-[11px] font-bold gap-1">
         <button
           onClick={() => setActiveTab('home')}
-          className={`py-1 px-2.5 rounded-lg ${activeTab === 'home' ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950' : 'text-slate-600 dark:text-slate-400'}`}
+          className={`py-1 px-2 rounded-lg whitespace-nowrap ${activeTab === 'home' ? 'text-white bg-slate-900 dark:text-red-400 dark:bg-red-950' : 'text-slate-600 dark:text-slate-400'}`}
         >
           Home
         </button>
         <button
           onClick={() => setActiveTab('requester_status')}
-          className={`py-1 px-2.5 rounded-lg ${activeTab === 'requester_status' ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950' : 'text-slate-600 dark:text-slate-400'}`}
+          className={`py-1 px-2 rounded-lg whitespace-nowrap ${activeTab === 'requester_status' ? 'text-white bg-slate-900 dark:text-red-400 dark:bg-red-950' : 'text-slate-600 dark:text-slate-400'}`}
         >
           Dispatch Status
         </button>
         <button
           onClick={() => setActiveTab('donor_dashboard')}
-          className={`py-1 px-2.5 rounded-lg ${activeTab === 'donor_dashboard' ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950' : 'text-slate-600 dark:text-slate-400'}`}
+          className={`py-1 px-2 rounded-lg whitespace-nowrap ${activeTab === 'donor_dashboard' ? 'text-white bg-slate-900 dark:text-red-400 dark:bg-red-950' : 'text-slate-600 dark:text-slate-400'}`}
         >
           Donor Dashboard
         </button>
         {currentUser?.role === 'admin' && (
           <button
             onClick={() => setActiveTab('admin')}
-            className={`py-1 px-2.5 rounded-lg ${activeTab === 'admin' ? 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950' : 'text-slate-600 dark:text-slate-400'}`}
+            className={`py-1 px-2 rounded-lg whitespace-nowrap ${activeTab === 'admin' ? 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950' : 'text-slate-600 dark:text-slate-400'}`}
           >
             Admin
           </button>

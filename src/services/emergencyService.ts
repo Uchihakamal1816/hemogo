@@ -33,7 +33,7 @@ export function subscribeToMyRequests(userId: string, callback: (requests: Blood
 }
 
 export function subscribeToRequestMatches(requestId: string, userId: string, callback: (matches: MatchRecord[]) => void): () => void {
-  const q = query(collection(db, 'matches'), where('requestId', '==', requestId), where('requesterId', '==', userId));
+  const q = query(collection(db, 'matches'), where('requestId', '==', requestId), where('requesterId', '==', userId), where('response', '==', 'ACCEPTED'));
   return onSnapshot(q, (snap) => callback(snap.docs.map((d) => d.data() as MatchRecord)),
     (err) => console.error('Match listener failed:', err));
 }
@@ -51,6 +51,10 @@ export async function acceptMatchWithScreening(matchId: string, screeningRespons
 
 export async function rejectMatch(matchId: string): Promise<void> {
   await httpsCallable(functions, 'rejectBloodRequest')({ matchId });
+}
+
+export async function withdrawFromMatch(matchId: string): Promise<void> {
+  await httpsCallable(functions, 'withdrawFromRequest')({ matchId });
 }
 
 export async function markRequestFulfilled(requestId: string): Promise<void> {

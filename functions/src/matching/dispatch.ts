@@ -8,6 +8,7 @@ import {
 export const ACTIVE_STATUSES = ['SEARCHING', 'DONORS_NOTIFIED', 'CONTACT_SHARED'];
 
 const BATCH_LIMIT = 400;
+const MAX_ALERTS_PER_TIER = 100;
 
 async function commitInChunks(writes: ((batch: FirebaseFirestore.WriteBatch) => void)[]) {
   for (let i = 0; i < writes.length; i += BATCH_LIMIT) {
@@ -84,14 +85,18 @@ export async function dispatchTier(requestId: string, tier: number): Promise<num
   const writes: ((batch: FirebaseFirestore.WriteBatch) => void)[] = [];
   const alerts: { donorId: string; matchId: string; score: number }[] = [];
 
-  for (const doc of donorDocs) {
-    const donor = doc.data();
-    if (doc.id === request.requesterId || alreadyMatched.has(doc.id) || isOnCooldown(donor.cooldownUntil, now)) continue;
-    alreadyMatched.add(doc.id);
+  const candidates = donorDocs
+    .filter((doc) => doc.id !== request.requesterId && !alreadyMatched.has(doc.id) && !isOnCooldown(doc.data().cooldownUntil, now))
+    .map((doc) => {
+      const donor = doc.data();
+      const location = classifyLocation(request.hospitalPinCode, donor.pinCode);
+      const premium = isPremiumActive(donor, now);
+      return { doc, donor, location, premium, score: priorityScore(premium, location) };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_ALERTS_PER_TIER);
 
-    const location = classifyLocation(request.hospitalPinCode, donor.pinCode);
-    const premium = isPremiumActive(donor, now);
-    const score = priorityScore(premium, location);
+  for (const { doc, donor, location, premium, score } of candidates) {
     const matchRef = db.collection('matches').doc(`${requestId}_${doc.id}`);
 
     writes.push((batch) => batch.set(matchRef, {
@@ -135,18 +140,25 @@ export async function dispatchTier(requestId: string, tier: number): Promise<num
   })));
   const pushDelivered = reachedCounts.reduce((sum, n) => sum + n, 0);
 
-  const totalNotified = (request.notifiedDonorsCount || 0) + alerts.length;
-  const update: Record<string, unknown> = {
-    searchTier: tier,
-    notifiedDonorsCount: totalNotified,
-    pushDeliveredCount: FieldValue.increment(pushDelivered),
-    updatedAt: nowIso,
-    nextEscalationAt: tier < MAX_TIER
-      ? new Date(now.getTime() + escalationDelayMs(Boolean(request.requesterIsPremium))).toISOString()
-      : request.expiresAt
-  };
-  if (request.status === 'SEARCHING' && totalNotified > 0) update.status = 'DONORS_NOTIFIED';
-  await requestRef.update(update);
+  // Re-read inside a transaction: the request may have been accepted or closed during dispatch.
+  const stillOpen = await db.runTransaction(async (tx) => {
+    const fresh = (await tx.get(requestRef)).data();
+    if (!fresh || !ACTIVE_STATUSES.includes(fresh.status)) return false;
+
+    const totalNotified = (fresh.notifiedDonorsCount || 0) + alerts.length;
+    tx.update(requestRef, {
+      searchTier: tier,
+      notifiedDonorsCount: totalNotified,
+      pushDeliveredCount: FieldValue.increment(pushDelivered),
+      updatedAt: nowIso,
+      nextEscalationAt: tier < MAX_TIER
+        ? new Date(now.getTime() + escalationDelayMs(Boolean(fresh.requesterIsPremium))).toISOString()
+        : fresh.expiresAt,
+      ...(fresh.status === 'SEARCHING' && totalNotified > 0 ? { status: 'DONORS_NOTIFIED' } : {})
+    });
+    return true;
+  });
+  if (!stillOpen) await expirePendingMatches(requestId);
 
   await audit('system', 'MATCH_DISPATCH', `bloodRequests/${requestId}`, `tier ${tier}: ${alerts.length} donors`);
   return alerts.length;
@@ -159,6 +171,33 @@ export async function expirePendingMatches(requestId: string) {
   await commitInChunks(pending.docs.map((d) => (batch) => batch.update(d.ref, { response: 'EXPIRED' })));
 }
 
+/** Ends live chat and location for a closed request, and tells accepted donors they can stand down. */
+export async function endContacts(requestId: string, outcome: string) {
+  const accepted = await db.collection('matches')
+    .where('requestId', '==', requestId).where('response', '==', 'ACCEPTED').get();
+
+  await commitInChunks(accepted.docs.flatMap((d) => [
+    (batch: FirebaseFirestore.WriteBatch) => batch.update(d.ref, {
+      contactOpen: false,
+      requestOutcome: outcome,
+      donorPhone: FieldValue.delete(),
+      requesterPhone: FieldValue.delete()
+    }),
+    (batch: FirebaseFirestore.WriteBatch) => batch.delete(db.collection('locations').doc(d.id))
+  ]));
+
+  if (outcome !== 'FULFILLED') {
+    const waiting = accepted.docs.filter((d) => !d.data().donationConfirmedAt).map((d) => d.data().donorId as string);
+    await pushToUsers(waiting, {
+      type: 'REQUEST_CLOSED',
+      title: 'You no longer need to travel',
+      body: 'This blood request has closed. Thank you for responding.',
+      requestId,
+      webRoute: '/?tab=donor_dashboard'
+    });
+  }
+}
+
 /** Widens searches that are still short of donors and expires old requests. */
 export async function runEscalations(now = new Date()) {
   const due = await db.collection('bloodRequests')
@@ -166,17 +205,32 @@ export async function runEscalations(now = new Date()) {
     .where('nextEscalationAt', '<=', now.toISOString())
     .limit(100).get();
 
-  await Promise.all(due.docs.map(async (doc) => {
-    const request = doc.data();
-    if (new Date(request.expiresAt) <= now) {
+  const results = await Promise.allSettled(due.docs.map(async (doc) => {
+    // Claim the run first, so an overlapping schedule or a failed dispatch retries later rather than twice.
+    const claimed = await db.runTransaction(async (tx) => {
+      const fresh = (await tx.get(doc.ref)).data();
+      if (!fresh || !ACTIVE_STATUSES.includes(fresh.status) || fresh.nextEscalationAt > now.toISOString()) return null;
+      tx.update(doc.ref, {
+        nextEscalationAt: new Date(now.getTime() + escalationDelayMs(Boolean(fresh.requesterIsPremium))).toISOString()
+      });
+      return fresh;
+    });
+    if (!claimed) return;
+
+    if (new Date(claimed.expiresAt) <= now) {
       await doc.ref.update({ status: 'EXPIRED', updatedAt: now.toISOString() });
       await expirePendingMatches(doc.id);
-    } else if ((request.acceptedDonorsCount || 0) >= request.unitsRequired || request.searchTier >= MAX_TIER) {
-      await doc.ref.update({ nextEscalationAt: request.expiresAt });
+      await endContacts(doc.id, 'EXPIRED');
+    } else if ((claimed.acceptedDonorsCount || 0) >= claimed.unitsRequired || claimed.searchTier >= MAX_TIER) {
+      await doc.ref.update({ nextEscalationAt: claimed.expiresAt });
     } else {
-      await dispatchTier(doc.id, request.searchTier + 1);
+      await dispatchTier(doc.id, claimed.searchTier + 1);
     }
   }));
+  // One bad request must not hold up the others.
+  results.forEach((result) => {
+    if (result.status === 'rejected') console.error('Escalation failed:', result.reason);
+  });
 }
 
 export async function expireMemberships(now = new Date()) {

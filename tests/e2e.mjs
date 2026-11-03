@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInWithCustomToken } from 'firebase/auth';
-import { collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, query, serverTimestamp, addDoc, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, query, serverTimestamp, addDoc, deleteDoc, setDoc, updateDoc, where } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 
 const PROJECT = 'demo-hemogo';
@@ -74,6 +74,7 @@ test('donors register and cannot read each other or skip server checks', async (
   await denied(updateDoc(doc(nearDonor.db, 'donors', nearDonor.uid), { availability: 'unavailable' }));
   await denied(updateDoc(doc(nearDonor.db, 'donors', nearDonor.uid), { premiumStatus: true }));
   await denied(setDoc(doc(stranger.db, 'donors', stranger.uid), { userId: stranger.uid, verificationStatus: true }));
+  await denied(deleteDoc(doc(nearDonor.db, 'donors', nearDonor.uid)));
 });
 
 test('a request alerts the near donor immediately without exposing contacts', async () => {
@@ -91,9 +92,8 @@ test('a request alerts the near donor immediately without exposing contacts', as
   assert.equal(seenByDonor.requesterPhone, undefined);
   assert.equal(seenByDonor.patientName, undefined);
 
-  const seenByRequester = (await getDoc(doc(requester.db, 'matches', matchId))).data();
-  assert.equal(seenByRequester.donorPhone, undefined);
-  assert.equal(seenByRequester.donorName, undefined);
+  // A requester learns nothing about a donor until that donor accepts.
+  await denied(getDoc(doc(requester.db, 'matches', matchId)));
 
   await denied(getDoc(doc(nearDonor.db, 'bloodRequests', requestId)));
   await denied(getDoc(doc(stranger.db, 'bloodRequests', requestId)));
@@ -198,9 +198,54 @@ test('payments: forged signatures fail and a signed webhook activates once', asy
   await assert.rejects(requester.call('verifyRazorpayPayment', { razorpay_order_id: orderId, razorpay_payment_id: 'pay_2', razorpay_signature: sig }), /another user/);
 });
 
+test('over-acceptance is blocked, withdrawal reopens the slot, and closing ends contact', async () => {
+  const pin = `57${unique.slice(0, 4)}`;
+  const [req, a, b] = await Promise.all(['6', '7', '8'].map((n) => signIn(`+9195${unique}${n}`)));
+  for (const d of [a, b]) await d.call('registerDonor', { name: 'D', bloodGroup: 'O+', pinCode: pin, consent: true });
+  const { request } = await req.call('createBloodRequest', {
+    patientName: 'P', bloodGroup: 'O+', hospitalName: 'H', hospitalPinCode: pin, unitsRequired: 1, urgency: 'critical'
+  });
+  const idOf = (d) => `${request.requestId}_${d.uid}`;
+
+  await a.call('acceptBloodRequest', { matchId: idOf(a), screeningResponses: FIT });
+  await assert.rejects(b.call('acceptBloodRequest', { matchId: idOf(b), screeningResponses: FIT }), /Enough donors/);
+  assert.equal((await getDoc(doc(b.db, 'matches', idOf(b)))).data().requesterPhone, undefined);
+
+  await a.call('withdrawFromRequest', { matchId: idOf(a) });
+  const reopened = (await getDoc(doc(req.db, 'bloodRequests', request.requestId))).data();
+  assert.equal(reopened.acceptedDonorsCount, 0);
+  assert.equal(reopened.status, 'DONORS_NOTIFIED');
+  assert.ok(reopened.nextEscalationAt <= new Date().toISOString());
+  const gone = (await getDoc(doc(a.db, 'matches', idOf(a)))).data();
+  assert.equal(gone.response, 'WITHDRAWN');
+  assert.equal(gone.requesterPhone, undefined);
+  await denied(getDoc(doc(req.db, 'matches', idOf(a))));
+
+  await b.call('acceptBloodRequest', { matchId: idOf(b), screeningResponses: FIT });
+  assert.equal((await getDoc(doc(req.db, 'matches', idOf(b)))).data().donorPhone, b.phone);
+  await setDoc(doc(b.db, 'locations', idOf(b)), { currentLat: 1, currentLng: 2 });
+
+  await req.call('closeBloodRequest', { requestId: request.requestId, outcome: 'CANCELLED' });
+  const closed = (await getDoc(doc(req.db, 'matches', idOf(b)))).data();
+  assert.equal(closed.donorPhone, undefined);
+  assert.equal(closed.requesterPhone, undefined);
+  await denied(getDoc(doc(req.db, 'locations', idOf(b))));
+  await denied(setDoc(doc(b.db, 'locations', idOf(b)), { currentLat: 3 }));
+  await denied(addDoc(collection(req.db, 'chats', idOf(b), 'messages'), {
+    matchId: idOf(b), senderId: req.uid, text: 'late', createdAt: serverTimestamp()
+  }));
+});
+
+test('non-string PINs and prototype keys are rejected', async () => {
+  const u = await signIn(`+9194${unique}5`);
+  await assert.rejects(u.call('registerDonor', { name: 'N', bloodGroup: 'O+', pinCode: 560001, consent: true }), /PIN/);
+  await assert.rejects(u.call('registerDonor', { name: 'N', bloodGroup: '__proto__', pinCode: '560001', consent: true }), /blood group/);
+  await assert.rejects(u.call('createBloodRequest', { patientName: 'P', bloodGroup: 'constructor', hospitalName: 'H', hospitalPinCode: '560001', unitsRequired: 1 }), /blood group/);
+});
+
 test('rate limit stops request spam', async () => {
   const data = { patientName: 'P', bloodGroup: 'A+', hospitalName: 'H', hospitalPinCode: '999999', unitsRequired: 1, urgency: 'critical' };
   const spammer = await signIn(`+9196${unique}8`);
   for (let i = 0; i < 3; i++) await spammer.call('createBloodRequest', data);
-  await assert.rejects(spammer.call('createBloodRequest', data), /request limit/);
+  await assert.rejects(spammer.call('createBloodRequest', data), /3 open requests/);
 });

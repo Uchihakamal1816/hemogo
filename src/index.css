@@ -91,7 +91,7 @@ body {
 }
 
 .glass-panel-elevated {
-  background: rgba(255, 255, 255, 0.95);
+  background: #fff;
   border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 24px;
   box-shadow: 0 20px 30px -10px rgba(148, 163, 184, 0.2);
@@ -99,7 +99,7 @@ body {
 }
 
 .dark .glass-panel-elevated {
-  background: rgba(30, 41, 59, 0.85);
+  background: #1e293b;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: var(--shadow-xl);
 }
@@ -258,7 +258,7 @@ body {
 }
 
 .btn-emerald {
-  background: linear-gradient(135deg, var(--emerald-600), var(--emerald-700));
+  background: linear-gradient(135deg, var(--emerald-700), #065f46);
   color: white;
   font-weight: 600;
   padding: 0.75rem 1.5rem;
@@ -274,6 +274,54 @@ body {
 }
 
 .btn-emerald:hover {
-  background: linear-gradient(135deg, var(--emerald-500), var(--emerald-600));
+  background: linear-gradient(135deg, var(--emerald-600), var(--emerald-700));
   transform: translateY(-1px);
+}
+
+/* Keyboard focus and native surfaces follow the theme */
+:focus-visible {
+  outline: 2px solid var(--blood-600);
+  outline-offset: 2px;
+}
+
+.dark :focus-visible {
+  outline-color: var(--blood-500);
+}
+
+input,
+select,
+textarea {
+  caret-color: var(--blood-600);
+}
+
+/* Phones zoom into inputs smaller than 16px */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.btn-primary svg,
+.btn-secondary svg,
+.btn-emerald svg {
+  flex-shrink: 0;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Comfortable tap targets on phones */
+@media (pointer: coarse) {
+  button,
+  a[href^="tel:"] {
+    min-height: 40px;
+    min-width: 40px;
+  }
 }

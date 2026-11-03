@@ -26,6 +26,11 @@ service cloud.firestore {
         (m.donorId == request.auth.uid || m.requesterId == request.auth.uid);
     }
 
+    // Live contact ends when the request closes or either side withdraws.
+    function hasOpenContact(matchId) {
+      return isPartyToAcceptedMatch(matchId) && matchData(matchId).contactOpen == true;
+    }
+
     // Users: roles and premium can never be self-assigned; admins are promoted in the console.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
@@ -50,7 +55,8 @@ service cloud.firestore {
       allow update: if (isOwner(donorId) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['name', 'email', 'alternatePhone', 'city', 'pinCode', 'preferredRadiusKm', 'updatedAt'])) || isAdmin();
-      allow delete: if isOwner(donorId) || isAdmin();
+      // Owners cannot delete: re-registering would erase the medical cooldown.
+      allow delete: if isAdmin();
     }
 
     match /deviceTokens/{userId} {
@@ -65,10 +71,11 @@ service cloud.firestore {
     }
 
     // Donor name and phone are only written here by the server after acceptance.
+    // Requesters see nothing about a donor until that donor accepts.
     match /matches/{matchId} {
       allow read: if isAuthenticated() && (
         resource.data.donorId == request.auth.uid ||
-        resource.data.requesterId == request.auth.uid ||
+        (resource.data.requesterId == request.auth.uid && resource.data.response == 'ACCEPTED') ||
         isAdmin()
       );
       allow write: if false;
@@ -76,7 +83,7 @@ service cloud.firestore {
 
     match /chats/{matchId}/messages/{messageId} {
       allow read: if isPartyToAcceptedMatch(matchId) || isAdmin();
-      allow create: if isPartyToAcceptedMatch(matchId) &&
+      allow create: if hasOpenContact(matchId) &&
         request.resource.data.senderId == request.auth.uid &&
         request.resource.data.matchId == matchId &&
         request.resource.data.text is string &&
@@ -87,8 +94,8 @@ service cloud.firestore {
     }
 
     match /locations/{matchId} {
-      allow read: if isPartyToAcceptedMatch(matchId) || isAdmin();
-      allow write: if isPartyToAcceptedMatch(matchId) && matchData(matchId).donorId == request.auth.uid;
+      allow read: if hasOpenContact(matchId) || isAdmin();
+      allow write: if hasOpenContact(matchId) && matchData(matchId).donorId == request.auth.uid;
     }
 
     match /subscriptions/{subId} {

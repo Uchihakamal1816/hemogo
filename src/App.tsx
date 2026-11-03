@@ -136,7 +136,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/70 dark:bg-[#030712] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-red-600 selection:text-white transition-colors duration-300 relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50/70 dark:bg-[#030712] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-red-600 selection:text-white transition-colors duration-300 relative overflow-x-clip">
       
       {/* 3D Biological Background Canvas */}
       {show3D && activeTab === 'home' && (
@@ -173,7 +173,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content View */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative">
         
         {/* Tab 1: Home Landing Page */}
         {activeTab === 'home' && (
@@ -232,7 +232,6 @@ export const App: React.FC = () => {
               <Phone className="w-3.5 h-3.5" />
               24/7 Emergency Line: 108 / 104
             </span>
-            <span>•</span>
             <span>HemoGo connects people. Final donor eligibility is decided by the blood bank.</span>
           </div>
         </div>

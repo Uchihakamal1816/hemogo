@@ -434,7 +434,7 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
       {/* 3D WebGL Canvas Layer */}
       <div 
         ref={mountRef} 
-        className="w-full h-full absolute inset-0 opacity-90 dark:opacity-80 transition-opacity" 
+        className="w-full h-full absolute inset-0 opacity-[0.16] dark:opacity-80 transition-opacity" 
       />
 
       {/* Luminous Ambient Lighting Layer behind 3D cells */}

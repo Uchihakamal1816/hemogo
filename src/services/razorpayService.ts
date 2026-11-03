@@ -83,6 +83,6 @@ export async function initiateSubscriptionCheckout(
     rzp.on('payment.failed', (res: any) => onError(res.error?.description || 'Payment failed.'));
     rzp.open();
   } catch (err: any) {
-    onError(err.code === 'functions/not-found' ? 'Premium is not available yet. Emergency requests work without it.' : err.message || 'Could not start payment.');
+    onError(err.code === 'functions/not-found' || err.code === 'functions/internal' ? 'Premium is not available right now. Emergency requests work without it.' : err.message || 'Could not start payment.');
   }
 }

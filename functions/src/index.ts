@@ -4,7 +4,7 @@ import { REGION } from './config/firebase';
 import { expireMemberships, runEscalations } from './matching/dispatch';
 import {
   acceptMatch, closeRequest, confirmDonation, createBloodRequest as createRequest,
-  registerDonor as register, rejectMatch, toggleAvailability
+  registerDonor as register, rejectMatch, toggleAvailability, withdrawMatch
 } from './requests/lifecycle';
 
 function requireUid(request: CallableRequest): string {
@@ -34,6 +34,9 @@ export const acceptBloodRequest = onCall(callable, (req) =>
 
 export const rejectBloodRequest = onCall(callable, (req) =>
   rejectMatch(requireUid(req), req.data?.matchId));
+
+export const withdrawFromRequest = onCall(callable, (req) =>
+  withdrawMatch(requireUid(req), req.data?.matchId));
 
 export const closeBloodRequest = onCall(callable, (req) =>
   closeRequest(requireUid(req), req.data?.requestId, req.data?.outcome));

@@ -4,6 +4,9 @@
       { "fieldPath": "availability", "order": "ASCENDING" },
       { "fieldPath": "bloodGroup", "order": "ASCENDING" },
       { "fieldPath": "pinCode", "order": "ASCENDING" } ] },
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "premiumStatus", "order": "ASCENDING" },
+      { "fieldPath": "premiumExpiry", "order": "ASCENDING" } ] },
     { "collectionGroup": "bloodRequests", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "requesterId", "order": "ASCENDING" },
       { "fieldPath": "createdAt", "order": "DESCENDING" } ] },

@@ -85,7 +85,7 @@ export interface BloodRequest {
 }
 
 export type LocationMatchTier = 'SAME_PIN' | 'NEIGHBOR_PIN' | 'RADIUS_EXPANDED';
-export type MatchResponse = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+export type MatchResponse = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'WITHDRAWN';
 
 export interface PreliminaryScreening {
   feelingWell: boolean;
@@ -124,6 +124,8 @@ export interface MatchRecord {
   requesterPhone?: string;
   notes?: string;
   donationConfirmedAt?: string | null;
+  contactOpen?: boolean;
+  requestOutcome?: BloodRequestStatus;
 }
 
 export interface SubscriptionRecord {
