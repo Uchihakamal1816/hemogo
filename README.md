@@ -7,7 +7,7 @@ A production-ready, full-stack emergency blood connection platform built with **
 ## 🚀 Overview of Completed Phases
 
 ### 🛡️ Phase 1: Database & Security (Backend Focus)
-- **Firebase Authentication**: Phone/SMS OTP login with reCAPTCHA verifier and simulation test mode.
+- **Firebase Authentication**: Phone/SMS OTP login with reCAPTCHA verifier.
 - **Database Schemas**: Strictly typed Firestore collections:
   - `/users/{uid}`: Profile, role, PIN code, `premiumStatus`, and expiry timestamps.
   - `/donors/{uid}`: Blood group, live availability, 90-day cooldown state, PIN code location, and protected contact info.
@@ -86,22 +86,21 @@ hemogo-app/
 
 ## 🚀 Running the App Locally
 
-### 1. Start the Frontend Web App
+### 1. Start against local emulators (needs Java 21+)
 ```bash
-npm install
-npm run dev
+npm install && npm --prefix functions install && npm --prefix functions run build
+npm run emulators
+npm run dev:emulators
 ```
 
-### 2. Deploy Cloud Functions & Security Rules to Firebase
+### Tests
 ```bash
-# Deploy Firestore rules, indexes, and Cloud Functions
-firebase deploy --only firestore,functions
+npm --prefix functions test
+npm run test:e2e
 ```
+
+### 2. Deploy
+See [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ---
 
-## 🧪 Built-in Test Personas (Instant 1-Click Testing)
-1. **Rahul Sharma** (O+ Active Donor - Eligible & Available)
-2. **Pooja Varma** (A+ Donor - In 90-Day Medical Cooldown)
-3. **Anil Kumar** (Emergency Requester tracking #HG10245)
-4. **Dr. Siddharth Sen** (HemoGo Super Administrator)

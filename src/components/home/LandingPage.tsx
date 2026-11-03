@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Activity
 } from 'lucide-react';
-import { DispatchRadar3D } from '../3d/DispatchRadar3D';
 import { BloodMatrix3D } from '../3d/BloodMatrix3D';
 
 interface LandingPageProps {
@@ -46,7 +45,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
-            HemoGo bridges critical blood shortages by instantly notifying verified donors in the exact hospital PIN area — powered by real-time geodesic dispatch, live GPS tracking, and zero-scrape donor privacy.
+            HemoGo alerts compatible donors near the hospital as soon as you ask for help. You see responses live, and your numbers stay private until a donor accepts.
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -86,11 +85,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* 3D Holographic Dispatch Radar Engine */}
-      <section className="space-y-4">
-        <DispatchRadar3D />
-      </section>
-
       {/* Clinical Blood Compatibility Visualizer */}
       <section className="space-y-4">
         <BloodMatrix3D />
@@ -105,7 +99,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white">How HemoGo Works</h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            A fast 4-step emergency bridge connecting patients and verified local donors
+            A fast 4-step emergency bridge connecting patients and local donors
           </p>
         </div>
 
@@ -167,7 +161,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            Premium members receive top priority dispatch in emergency request matching in their PIN code, instant WhatsApp notifications, and automated donation certificates.
+            Everyone's first alerts go out immediately. Premium members' searches widen sooner when no donor has accepted, and member donors are listed first.
           </p>
 
           <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium italic">

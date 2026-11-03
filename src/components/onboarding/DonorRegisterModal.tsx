@@ -27,13 +27,11 @@ export const DonorRegisterModal: React.FC<DonorRegisterModalProps> = ({
 }) => {
   const [name, setName] = useState(currentUser?.name || '');
   const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O+');
-  const [phone, setPhone] = useState(currentUser?.phone || '+91 98765 43210');
-  const [pinCode, setPinCode] = useState(currentUser?.pinCode || '530016');
-  const [email] = useState(currentUser?.email || '');
+  const [pinCode, setPinCode] = useState(currentUser?.pinCode || '');
   
   // Mandatory Consents (PRD Section 2)
-  const [consentEmergency, setConsentEmergency] = useState(true);
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [consentEmergency, setConsentEmergency] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +51,6 @@ export const DonorRegisterModal: React.FC<DonorRegisterModalProps> = ({
       setError('Please provide your full name.');
       return;
     }
-    if (!phone.trim()) {
-      setError('Please enter a valid phone number.');
-      return;
-    }
     if (!pinCode.trim() || pinCode.trim().length !== 6) {
       setError('A valid 6-digit PIN code is required for emergency matching.');
       return;
@@ -68,28 +62,7 @@ export const DonorRegisterModal: React.FC<DonorRegisterModalProps> = ({
 
     setLoading(true);
     try {
-      const nowIso = new Date().toISOString();
-      const donorData: DonorProfile = {
-        donorId: currentUser.userId,
-        userId: currentUser.userId,
-        name,
-        phone,
-        bloodGroup,
-        pinCode,
-        email: email || undefined,
-        availability: 'available',
-        verificationStatus: true,
-        premiumStatus: currentUser.premiumStatus,
-        premiumExpiry: currentUser.premiumExpiry,
-        totalRequestsReceived: 0,
-        totalAccepted: 0,
-        totalRejected: 0,
-        totalCompleted: 0,
-        createdAt: nowIso,
-        updatedAt: nowIso
-      };
-
-      const saved = await registerDonorProfile(donorData);
+      const saved = await registerDonorProfile({ name: name.trim(), bloodGroup, pinCode: pinCode.trim(), consent: true });
       onSuccess(saved);
       onClose();
     } catch (err: any) {
@@ -136,7 +109,7 @@ export const DonorRegisterModal: React.FC<DonorRegisterModalProps> = ({
             <input
               type="text"
               required
-              placeholder="e.g. Rahul Sharma"
+              placeholder="Your full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
@@ -175,7 +148,7 @@ export const DonorRegisterModal: React.FC<DonorRegisterModalProps> = ({
                 type="text"
                 required
                 maxLength={6}
-                placeholder="530016"
+                placeholder="6-digit PIN"
                 value={pinCode}
                 onChange={(e) => setPinCode(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
@@ -184,16 +157,11 @@ export const DonorRegisterModal: React.FC<DonorRegisterModalProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Mobile Number
+                Verified Mobile Number
               </label>
-              <input
-                type="tel"
-                required
-                placeholder="+91 98765 43210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
-              />
+              <div className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-300">
+                {currentUser?.phone}
+              </div>
             </div>
           </div>
 

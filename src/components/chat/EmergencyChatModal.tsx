@@ -9,7 +9,7 @@ import {
   CheckCheck
 } from 'lucide-react';
 import type { ChatMessage, UserProfile } from '../../types/database';
-import { getStoredChatMessages, sendChatMessage } from '../../services/chatService';
+import { sendChatMessage, subscribeToChat } from '../../services/chatService';
 
 interface EmergencyChatModalProps {
   isOpen: boolean;
@@ -44,49 +44,36 @@ export const EmergencyChatModal: React.FC<EmergencyChatModalProps> = ({
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (isOpen) {
-      loadMessages();
-      const interval = setInterval(loadMessages, 2500);
-      return () => clearInterval(interval);
-    }
-  }, [isOpen, requestId]);
+    if (isOpen && matchId) return subscribeToChat(matchId, setMessages);
+  }, [isOpen, matchId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const loadMessages = () => {
-    if (!requestId) return;
-    const list = getStoredChatMessages(requestId);
-    setMessages([...list]);
-  };
-
   if (!isOpen || !currentUser) return null;
+
+  const send = async (text: string) => {
+    setError(null);
+    try {
+      await sendChatMessage({ requestId, matchId, sender: currentUser, text });
+    } catch {
+      setError('Message not sent. Please check your connection, or call instead.');
+    }
+  };
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim()) return;
-
-    sendChatMessage({
-      requestId,
-      matchId,
-      sender: currentUser,
-      text: inputText.trim()
-    });
-
+    send(inputText.trim());
     setInputText('');
-    loadMessages();
   };
 
   const handleQuickChip = (text: string) => {
-    sendChatMessage({
-      requestId,
-      matchId,
-      sender: currentUser,
-      text
-    });
-    loadMessages();
+    send(text);
   };
 
   return (
@@ -103,7 +90,7 @@ export const EmergencyChatModal: React.FC<EmergencyChatModalProps> = ({
               <div className="flex items-center gap-2">
                 <span className="font-black text-sm text-white">{otherPartyName}</span>
                 <span className="text-[10px] font-bold px-2 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 uppercase">
-                  Verified Contact
+                  Matched Contact
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 flex items-center gap-1">
@@ -138,22 +125,12 @@ export const EmergencyChatModal: React.FC<EmergencyChatModalProps> = ({
           <div className="text-center py-1">
             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-slate-400">
               <Lock className="w-3 h-3 text-emerald-400" />
-              <span>End-to-End Encrypted Emergency Session</span>
+              <span>Private to you and your match</span>
             </span>
           </div>
 
           {messages.map((msg) => {
             const isMe = msg.senderId === currentUser.userId;
-            const isSystem = msg.senderRole === 'system';
-
-            if (isSystem) {
-              return (
-                <div key={msg.messageId} className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-center text-xs text-slate-300">
-                  <span className="text-emerald-400 font-bold">System: </span>
-                  <span>{msg.text}</span>
-                </div>
-              );
-            }
 
             return (
               <div
@@ -180,6 +157,7 @@ export const EmergencyChatModal: React.FC<EmergencyChatModalProps> = ({
               </div>
             );
           })}
+          {error && <div className="text-center text-[11px] text-red-400">{error}</div>}
           <div ref={messagesEndRef} />
         </div>
 

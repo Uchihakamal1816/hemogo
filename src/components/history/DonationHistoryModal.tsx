@@ -28,8 +28,7 @@ export const DonationHistoryModal: React.FC<DonationHistoryModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const list = getDonorDonationHistory(donorId);
-      setRecords(list);
+      getDonorDonationHistory(donorId).then(setRecords).catch(console.error);
     }
   }, [isOpen, donorId]);
 
@@ -55,7 +54,7 @@ export const DonationHistoryModal: React.FC<DonationHistoryModalProps> = ({
           <div>
             <h2 className="text-xl font-black text-white">Donation History & Certificates</h2>
             <p className="text-xs text-slate-400">
-              Verified hospital blood bank donations by {donorName}
+              Donations confirmed by the requester for {donorName}
             </p>
           </div>
         </div>
@@ -101,8 +100,8 @@ export const DonationHistoryModal: React.FC<DonationHistoryModalProps> = ({
                 <div className="font-bold text-white">{new Date(selectedCert.donatedAt).toLocaleDateString()}</div>
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 uppercase font-bold">Verified By</div>
-                <div className="font-bold text-emerald-400">{selectedCert.bloodBankDoctor}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-bold">Confirmed By</div>
+                <div className="font-bold text-emerald-400">{selectedCert.bloodBankVerified ? selectedCert.bloodBankDoctor : 'Requester (not blood bank verified)'}</div>
               </div>
             </div>
 
@@ -149,7 +148,7 @@ export const DonationHistoryModal: React.FC<DonationHistoryModalProps> = ({
                   <span>•</span>
                   <span className="text-emerald-400 flex items-center gap-1">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    Verified by Blood Bank
+                    Requester Confirmed
                   </span>
                 </div>
               </div>

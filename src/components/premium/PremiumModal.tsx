@@ -18,7 +18,6 @@ interface PremiumModalProps {
   isOpen: boolean;
   currentUser: UserProfile | null;
   onClose: () => void;
-  onSuccess: (updatedUser: UserProfile) => void;
   onPromptLogin: () => void;
 }
 
@@ -26,7 +25,6 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
   isOpen,
   currentUser,
   onClose,
-  onSuccess,
   onPromptLogin
 }) => {
   const [loading, setLoading] = useState(false);
@@ -46,7 +44,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
     try {
       await initiateSubscriptionCheckout(
         currentUser,
-        (updatedUser) => {
+        () => {
           setLoading(false);
           setPaymentSuccess(true);
           confetti({
@@ -54,7 +52,6 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
             spread: 80,
             origin: { y: 0.6 }
           });
-          onSuccess(updatedUser);
         },
         (err) => {
           setLoading(false);
@@ -109,7 +106,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
                 HemoGo <span className="text-amber-400">Premium</span>
               </h2>
               <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                Priority matching dispatch during emergency blood requests for dedicated lifesaver donors.
+                Everyone's first alerts go out immediately. Premium widens your search sooner if no donor has accepted.
               </p>
             </div>
 
@@ -126,7 +123,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-black text-white">{HEMOGO_PREMIUM_PLAN.name}</div>
-                  <div className="text-xs text-amber-400 font-semibold">Priority 1 Matching Score in Your PIN Code</div>
+                  <div className="text-xs text-amber-400 font-semibold">Faster search widening</div>
                 </div>
 
                 <div className="text-right">
@@ -170,7 +167,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Razorpay Secured Gateway • 256-bit SSL Encryption</span>
+                <span>Payment handled by Razorpay</span>
               </div>
               <span>UPI / Cards / NetBanking</span>
             </div>

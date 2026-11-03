@@ -4,13 +4,10 @@ import {
   User, 
   Phone, 
   MapPin, 
-  Bell, 
   Check, 
   AlertCircle, 
   Sliders, 
   ShieldCheck, 
-  MessageSquare, 
-  Smartphone,
   Navigation
 } from 'lucide-react';
 import type { DonorProfile } from '../../types/database';
@@ -20,26 +17,19 @@ interface DonorSettingsModalProps {
   isOpen: boolean;
   donor: DonorProfile;
   onClose: () => void;
-  onProfileUpdated: (updated: DonorProfile) => void;
 }
 
 export const DonorSettingsModal: React.FC<DonorSettingsModalProps> = ({
   isOpen,
   donor,
-  onClose,
-  onProfileUpdated
+  onClose
 }) => {
   const [name, setName] = useState(donor.name || '');
-  const [phone, setPhone] = useState(donor.phone || '');
   const [alternatePhone, setAlternatePhone] = useState(donor.alternatePhone || '');
-  const [city, setCity] = useState(donor.city || 'Visakhapatnam');
+  const [city, setCity] = useState(donor.city || '');
   const [pinCode, setPinCode] = useState(donor.pinCode || '');
   const [preferredRadiusKm, setPreferredRadiusKm] = useState(donor.preferredRadiusKm || 10);
   
-  const [smsAlerts, setSmsAlerts] = useState(donor.notificationPreferences?.sms ?? true);
-  const [whatsappAlerts, setWhatsappAlerts] = useState(donor.notificationPreferences?.whatsapp ?? true);
-  const [pushAlerts, setPushAlerts] = useState(donor.notificationPreferences?.push ?? true);
-
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -63,22 +53,15 @@ export const DonorSettingsModal: React.FC<DonorSettingsModalProps> = ({
 
     setSaving(true);
     try {
-      const updated = await updateDonorSettings(donor.donorId, {
+      await updateDonorSettings(donor.donorId, {
         name: name.trim(),
-        phone: phone.trim(),
         alternatePhone: alternatePhone.trim(),
         city: city.trim(),
         pinCode: pinCode.trim(),
-        preferredRadiusKm,
-        notificationPreferences: {
-          sms: smsAlerts,
-          whatsapp: whatsappAlerts,
-          push: pushAlerts
-        }
+        preferredRadiusKm
       });
 
       setSuccess(true);
-      onProfileUpdated(updated);
       setTimeout(() => {
         onClose();
       }, 900);
@@ -167,16 +150,8 @@ export const DonorSettingsModal: React.FC<DonorSettingsModalProps> = ({
                 <label className="text-[11px] font-semibold text-slate-300 block mb-1">
                   Primary Mobile (OTP Verified)
                 </label>
-                <div className="relative">
-                  <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
-                    placeholder="+91 98765 43210"
-                    required
-                  />
+                <div className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-300">
+                  {donor.phone}
                 </div>
               </div>
 
@@ -229,7 +204,7 @@ export const DonorSettingsModal: React.FC<DonorSettingsModalProps> = ({
                   value={pinCode}
                   onChange={(e) => setPinCode(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-red-500"
-                  placeholder="530016"
+                  placeholder="6-digit PIN"
                   required
                 />
               </div>
@@ -257,64 +232,6 @@ export const DonorSettingsModal: React.FC<DonorSettingsModalProps> = ({
                 <span>15 km (Citywide)</span>
                 <span>30 km (District)</span>
               </div>
-            </div>
-          </div>
-
-          {/* Notification Alert Channels */}
-          <div className="space-y-3.5 pt-2 border-t border-slate-800">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <Bell className="w-3.5 h-3.5 text-amber-400" />
-              <span>Emergency Dispatch Channels</span>
-            </h3>
-
-            <div className="space-y-2.5">
-              <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Smartphone className="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <div className="text-xs font-bold text-white">Instant SMS Dispatch</div>
-                    <div className="text-[10px] text-slate-400">High-priority SMS when matching requests occur</div>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={smsAlerts}
-                  onChange={(e) => setSmsAlerts(e.target.checked)}
-                  className="w-4 h-4 accent-red-600 rounded cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <div className="text-xs font-bold text-white">WhatsApp Emergency Alerts</div>
-                    <div className="text-[10px] text-slate-400">Receive hospital location and patient details via WhatsApp</div>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={whatsappAlerts}
-                  onChange={(e) => setWhatsappAlerts(e.target.checked)}
-                  className="w-4 h-4 accent-red-600 rounded cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Bell className="w-4 h-4 text-blue-400" />
-                  <div>
-                    <div className="text-xs font-bold text-white">In-App Sound & Push Notifications</div>
-                    <div className="text-[10px] text-slate-400">Foreground siren and background mobile push alerts</div>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={pushAlerts}
-                  onChange={(e) => setPushAlerts(e.target.checked)}
-                  className="w-4 h-4 accent-red-600 rounded cursor-pointer"
-                />
-              </label>
             </div>
           </div>
 

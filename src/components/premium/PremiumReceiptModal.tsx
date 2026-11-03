@@ -100,10 +100,10 @@ export const PremiumReceiptModal: React.FC<PremiumReceiptModalProps> = ({
                 Billed To (Subscriber)
               </div>
               <div className="font-bold text-white print:text-black text-sm">
-                {subscription.donorName || 'Rahul Sharma'}
+                {subscription.donorName}
               </div>
               <div className="text-slate-300 print:text-gray-700 font-mono mt-0.5">
-                {subscription.donorPhone || '+91 98765 43210'}
+                {subscription.donorPhone}
               </div>
               {subscription.donorEmail && (
                 <div className="text-slate-400 print:text-gray-600 text-[11px]">

@@ -6,29 +6,19 @@ import {
   ArrowRight, 
   AlertCircle, 
   ShieldCheck,
-  RefreshCw,
-  Sparkles
+  RefreshCw
 } from 'lucide-react';
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
-import { 
-  initializeRecaptcha, 
-  sendOtpToPhone, 
-  verifyPhoneOtp, 
-  DEMO_PRESET_USERS, 
-  setDemoUserPreset 
-} from '../../services/authService';
-import type { UserProfile } from '../../types/database';
+import { initializeRecaptcha, sendOtpToPhone, verifyPhoneOtp } from '../../services/authService';
 
 interface PhoneAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (user: UserProfile) => void;
 }
 
 export const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
   isOpen,
-  onClose,
-  onSuccess
+  onClose
 }) => {
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -38,7 +28,6 @@ export const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [isSimulated, setIsSimulated] = useState(false);
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -50,10 +39,6 @@ export const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
       setOtpDigits(['', '', '', '', '', '']);
       setError(null);
       
-      // Initialize reCAPTCHA
-      setTimeout(() => {
-        recaptchaVerifierRef.current = initializeRecaptcha('recaptcha-container');
-      }, 300);
     }
   }, [isOpen]);
 
@@ -81,24 +66,14 @@ export const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
 
     setLoading(true);
     try {
-      const fullPhone = `${countryCode}${cleanNum}`;
-      const result = await sendOtpToPhone(fullPhone, recaptchaVerifierRef.current);
-      
-      if (result.confirmationResult) {
-        setConfirmationResult(result.confirmationResult);
-      }
-      setIsSimulated(result.isMock);
+      recaptchaVerifierRef.current?.clear();
+      recaptchaVerifierRef.current = initializeRecaptcha('recaptcha-container');
+      const result = await sendOtpToPhone(`${countryCode}${cleanNum}`, recaptchaVerifierRef.current);
+      setConfirmationResult(result);
       setStep('otp');
       setResendTimer(60);
-
-      // Auto-fill test digits in simulation mode for ease of developer testing
-      if (result.isMock) {
-        setTimeout(() => {
-          setOtpDigits(['1', '2', '3', '4', '5', '6']);
-        }, 500);
-      }
     } catch (err: any) {
-      setError(err.message || 'Failed to send OTP. Please try again.');
+      setError(err.code === 'auth/too-many-requests' ? 'Too many attempts. Please wait a few minutes, or call 104 if this is urgent.' : err.code === 'auth/invalid-phone-number' ? 'That phone number is not valid.' : 'Could not send the code. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -146,21 +121,14 @@ export const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const fullPhone = `${countryCode} ${phoneNumber}`;
-      const user = await verifyPhoneOtp(enteredOtp, confirmationResult, fullPhone);
-      onSuccess(user);
+      if (!confirmationResult) throw new Error('Please request a new code.');
+      await verifyPhoneOtp(enteredOtp, confirmationResult);
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Invalid OTP code entered.');
+      setError(err.code === 'auth/invalid-verification-code' ? 'That code is not correct.' : err.code === 'auth/code-expired' ? 'That code has expired. Please request a new one.' : err.message || 'Could not verify the code.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSelectPreset = (key: keyof typeof DEMO_PRESET_USERS) => {
-    const user = setDemoUserPreset(key);
-    onSuccess(user);
-    onClose();
   };
 
   return (
@@ -215,9 +183,6 @@ export const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
                   className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-semibold focus:outline-none focus:border-red-500"
                 >
                   <option value="+91">🇮🇳 +91 (IN)</option>
-                  <option value="+1">🇺🇸 +1 (US)</option>
-                  <option value="+44">🇬🇧 +44 (UK)</option>
-                  <option value="+971">🇦🇪 +971 (UAE)</option>
                 </select>
                 
                 <div className="relative flex-1">
@@ -251,65 +216,12 @@ export const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
               )}
             </button>
 
-            {/* Quick Demo Test Presets */}
-            <div className="pt-4 border-t border-slate-800">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-amber-400" />
-                  Quick Test Logins
-                </span>
-                <span className="text-[10px] text-slate-500">1-click login</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSelectPreset('donor_active')}
-                  className="p-2 text-left rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-emerald-500/50 transition-all text-xs"
-                >
-                  <div className="font-semibold text-emerald-400">Rahul Sharma</div>
-                  <div className="text-[10px] text-slate-400">O+ Active Donor</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPreset('donor_cooldown')}
-                  className="p-2 text-left rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 transition-all text-xs"
-                >
-                  <div className="font-semibold text-amber-400">Pooja Varma</div>
-                  <div className="text-[10px] text-slate-400">A+ in Cooldown</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPreset('requester_emergency')}
-                  className="p-2 text-left rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-red-500/50 transition-all text-xs"
-                >
-                  <div className="font-semibold text-red-400">Anil Kumar</div>
-                  <div className="text-[10px] text-slate-400">Requester</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPreset('premium_hero')}
-                  className="p-2 text-left rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 transition-all text-xs"
-                >
-                  <div className="font-semibold text-amber-300">Dr. Siddharth</div>
-                  <div className="text-[10px] text-slate-400">Premium Hero</div>
-                </button>
-              </div>
-            </div>
           </form>
         )}
 
         {/* Step 2: OTP Entry */}
         {step === 'otp' && (
           <form onSubmit={handleVerifyOtp} className="space-y-5">
-            {isSimulated && (
-              <div className="p-2.5 rounded-xl bg-blue-950/60 border border-blue-800/60 text-blue-300 text-xs flex items-center justify-between">
-                <span>🧪 Demo Code: <strong>123456</strong> (Auto-filled)</span>
-                <span className="text-[10px] uppercase font-bold text-blue-400 bg-blue-900/60 px-1.5 py-0.5 rounded">
-                  Test Mode
-                </span>
-              </div>
-            )}
-
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-3 text-center">
                 Enter 6-Digit OTP

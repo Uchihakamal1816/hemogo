@@ -25,7 +25,7 @@ export const PastEmergenciesModal: React.FC<PastEmergenciesModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setHistoryList(getRequesterPastEmergencies(userId));
+      getRequesterPastEmergencies(userId).then(setHistoryList).catch(console.error);
     }
   }, [isOpen, userId]);
 

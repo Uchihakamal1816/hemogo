@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Clock, 
@@ -16,31 +16,34 @@ import {
   AlertTriangle,
   MessageSquare,
   Award,
+  BellRing,
+  Navigation,
   Sliders
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { 
   DonorProfile, 
   UserProfile, 
-  MatchRecord, 
-  PreliminaryScreening 
+  MatchRecord
 } from '../../types/database';
 import { 
-  getDonorProfile, 
+  subscribeToDonor, 
   toggleDonorAvailability, 
   getCooldownStatus 
 } from '../../services/donorService';
 import { 
-  getPendingMatchesForDonor, 
+  subscribeToDonorMatches, 
   acceptMatchWithScreening, 
   rejectMatch 
 } from '../../services/emergencyService';
+import { enablePushAlerts, getPushState, type PushState } from '../../services/notificationService';
+import { startSharingLocation } from '../../services/locationService';
 import { EmergencyChatModal } from '../chat/EmergencyChatModal';
 import { DonationHistoryModal } from '../history/DonationHistoryModal';
 import { DonorSettingsModal } from './DonorSettingsModal';
 import { PremiumAnalyticsWidget } from './PremiumAnalyticsWidget';
 import { PremiumReceiptModal } from '../premium/PremiumReceiptModal';
-import { getUserSubscription } from '../../services/razorpayService';
+import { subscribeToUserSubscription } from '../../services/razorpayService';
 import type { SubscriptionRecord } from '../../types/database';
 
 interface DonorDashboardProps {
@@ -57,7 +60,8 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   onOpenPremium
 }) => {
   const [donor, setDonor] = useState<DonorProfile | null>(null);
-  const [pendingMatches, setPendingMatches] = useState<(MatchRecord & { requestDetails?: any })[]>([]);
+  const [pendingMatches, setPendingMatches] = useState<MatchRecord[]>([]);
+  const [acceptedMatches, setAcceptedMatches] = useState<MatchRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -66,48 +70,73 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   // Modals & Chat
   const [activeScreeningMatch, setActiveScreeningMatch] = useState<MatchRecord | null>(null);
   const [screeningAnswers, setScreeningAnswers] = useState({
-    feelingWell: true,
-    recentDonation: false,
-    hasInfectionSymptoms: false,
-    takingMedications: false,
-    previousDecline: false,
-    willingForBloodBankScreening: true
+    feelingWell: false,
+    recentDonation: true,
+    hasInfectionSymptoms: true,
+    takingMedications: true,
+    previousDecline: true,
+    willingForBloodBankScreening: false
   });
-  const [acceptedContactInfo, setAcceptedContactInfo] = useState<any | null>(null);
+  const [chatMatch, setChatMatch] = useState<MatchRecord | null>(null);
+  const [sharingMatchId, setSharingMatchId] = useState<string | null>(null);
+  const stopSharingRef = useRef<(() => void) | null>(null);
+  const [pushState, setPushState] = useState<PushState>('unsupported');
   const [submittingScreening, setSubmittingScreening] = useState(false);
 
-  const [showChatModal, setShowChatModal] = useState(false);
   const [showDonationHistory, setShowDonationHistory] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 4000);
-    return () => clearInterval(interval);
-  }, [currentUser]);
-
-  const loadData = async () => {
     if (!currentUser) {
       setLoading(false);
       return;
     }
 
+    setLoading(true);
+    const stops = [
+      subscribeToDonor(currentUser.userId, (profile) => {
+        setDonor(profile);
+        setLoading(false);
+      }),
+      subscribeToDonorMatches(currentUser.userId, (matches) => {
+        const byPriority = [...matches].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        setPendingMatches(byPriority.filter((m) => m.response === 'PENDING'));
+        setAcceptedMatches(byPriority.filter((m) => m.response === 'ACCEPTED' && !m.donationConfirmedAt));
+      }),
+      subscribeToUserSubscription(currentUser.userId, setSubscription)
+    ];
+    getPushState().then(setPushState);
+    return () => stops.forEach((stop) => stop());
+  }, [currentUser?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => stopSharingRef.current?.(), []);
+
+  const handleEnableAlerts = async () => {
+    setErrorMsg(null);
     try {
-      const profile = await getDonorProfile(currentUser.userId);
-      setDonor(profile);
-      if (profile) {
-        const matches = getPendingMatchesForDonor(profile.donorId || currentUser.userId);
-        setPendingMatches(matches);
-      }
-      const sub = getUserSubscription(currentUser.userId);
-      setSubscription(sub);
+      await enablePushAlerts(currentUser!.userId);
+      setPushState('granted');
+      setSuccessMsg('Emergency alerts are on for this device.');
     } catch (err: any) {
-      console.error('Error loading donor dashboard:', err);
-    } finally {
-      setLoading(false);
+      setErrorMsg(err.message || 'Could not turn on alerts.');
+      getPushState().then(setPushState);
     }
+  };
+
+  const handleToggleSharing = (match: MatchRecord) => {
+    stopSharingRef.current?.();
+    stopSharingRef.current = null;
+    if (sharingMatchId === match.matchId) {
+      setSharingMatchId(null);
+      return;
+    }
+    stopSharingRef.current = startSharingLocation(match, (message) => {
+      setErrorMsg(message);
+      setSharingMatchId(null);
+    });
+    setSharingMatchId(match.matchId);
   };
 
   const handleToggle = async () => {
@@ -118,8 +147,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
 
     const targetState = donor.availability === 'available' ? 'unavailable' : 'available';
     try {
-      const result = await toggleDonorAvailability(donor.donorId || currentUser!.userId, targetState);
-      setDonor({ ...donor, availability: result.availability });
+      const result = await toggleDonorAvailability(targetState);
       setSuccessMsg(result.message);
 
       if (result.availability === 'available') {
@@ -137,21 +165,24 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   };
 
   const handleReject = async (matchId: string) => {
-    if (!donor) return;
-    await rejectMatch(donor.donorId || currentUser!.userId, matchId);
-    setPendingMatches(prev => prev.filter(m => m.matchId !== matchId));
-    setSuccessMsg('Request rejected. You will not be notified again for this request.');
+    setErrorMsg(null);
+    try {
+      await rejectMatch(matchId);
+      setSuccessMsg('Request declined. You will not be alerted again for this request.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Could not decline the request.');
+    }
   };
 
   const handleOpenScreening = (match: MatchRecord) => {
     setActiveScreeningMatch(match);
     setScreeningAnswers({
-      feelingWell: true,
-      recentDonation: false,
-      hasInfectionSymptoms: false,
-      takingMedications: false,
-      previousDecline: false,
-      willingForBloodBankScreening: true
+      feelingWell: false,
+      recentDonation: true,
+      hasInfectionSymptoms: true,
+      takingMedications: true,
+      previousDecline: true,
+      willingForBloodBankScreening: false
     });
   };
 
@@ -159,41 +190,19 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
     e.preventDefault();
     if (!donor || !activeScreeningMatch) return;
 
-    if (!screeningAnswers.willingForBloodBankScreening) {
-      setErrorMsg('You must agree to the blood bank screening before proceeding.');
-      return;
-    }
-
     setSubmittingScreening(true);
     setErrorMsg(null);
     try {
-      const screeningPayload: PreliminaryScreening = {
-        ...screeningAnswers,
-        confirmedAt: new Date().toISOString()
-      };
+      await acceptMatchWithScreening(activeScreeningMatch.matchId, screeningAnswers);
 
-      const result = await acceptMatchWithScreening(donor.donorId || currentUser!.userId, activeScreeningMatch.matchId, screeningPayload);
-      
       confetti({
         particleCount: 100,
         spread: 80,
         origin: { y: 0.6 }
       });
 
-      setAcceptedContactInfo({
-        requestId: result.request.requestId,
-        matchId: activeScreeningMatch.matchId,
-        patientName: result.request.patientName,
-        hospitalName: result.request.hospitalName,
-        hospitalPinCode: result.request.hospitalPinCode,
-        requesterPhone: result.request.requesterPhone,
-        unitsRequired: result.request.unitsRequired,
-        bloodGroup: result.request.bloodGroup
-      });
-
       setActiveScreeningMatch(null);
       setSuccessMsg('Thank you! Your response has been sent to the requester.');
-      loadData();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to submit acceptance screening.');
     } finally {
@@ -210,7 +219,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
           Sign in to manage your availability, receive emergency blood alerts, and view donation history.
         </p>
         <button onClick={onOpenAuth} className="btn-primary w-full justify-center text-xs font-bold">
-          Sign In / Switch Persona
+          Sign In
         </button>
       </div>
     );
@@ -241,10 +250,10 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   }
 
   const cooldown = getCooldownStatus(donor);
-  const displayName = donor.name || currentUser.name || 'Rahul Sharma';
-  const displayPin = donor.pinCode || currentUser.pinCode || '530016';
-  const displayPhone = donor.phone || currentUser.phone || '+91 98765 43210';
-  const displayBlood = donor.bloodGroup || 'O+';
+  const displayName = donor.name;
+  const displayPin = donor.pinCode;
+  const displayPhone = donor.phone;
+  const displayBlood = donor.bloodGroup;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
@@ -280,41 +289,62 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         </div>
       )}
 
-      {/* Connected Requester Card upon successful acceptance */}
-      {acceptedContactInfo && (
-        <div className="p-6 rounded-2xl bg-emerald-950/90 border-2 border-emerald-500 text-slate-100 space-y-3 shadow-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-bold text-emerald-300 text-base">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>Response Sent! Connect with the Hospital / Requester</span>
-            </div>
-            <button onClick={() => setAcceptedContactInfo(null)} className="text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
+      {(pushState === 'default' || pushState === 'denied') && (
+        <div className="p-4 rounded-xl bg-amber-950/80 border border-amber-700 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <BellRing className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>
+              {pushState === 'denied'
+                ? 'Notifications are blocked. Allow them in your browser settings or you will miss emergencies.'
+                : 'Turn on alerts so you hear about emergencies when HemoGo is closed.'}
+            </span>
+          </div>
+          {pushState === 'default' && (
+            <button onClick={handleEnableAlerts} className="btn-primary !py-2 !px-4 text-xs font-bold flex-shrink-0">
+              Turn On Alerts
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Requests this donor accepted */}
+      {acceptedMatches.map((match) => (
+        <div key={match.matchId} className="p-6 rounded-2xl bg-emerald-950/90 border-2 border-emerald-500 text-slate-100 space-y-3 shadow-xl">
+          <div className="flex items-center gap-2 font-bold text-emerald-300 text-base">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <span>You accepted: go to {match.hospitalName}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
             <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
               <div className="text-[10px] text-slate-400 uppercase font-bold">Patient & Hospital</div>
-              <div className="font-bold text-white text-sm">{acceptedContactInfo.patientName}</div>
-              <div className="text-slate-300">{acceptedContactInfo.hospitalName} (PIN: {acceptedContactInfo.hospitalPinCode})</div>
+              <div className="font-bold text-white text-sm">{match.patientName}</div>
+              <div className="text-slate-300">{match.hospitalName} (PIN: {match.hospitalPinCode})</div>
+              {match.notes && <div className="text-slate-400">{match.notes}</div>}
             </div>
 
-            <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+            <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-bold">Requester Phone</div>
-                <div className="font-mono font-bold text-white text-sm">{acceptedContactInfo.requesterPhone}</div>
+                <div className="font-mono font-bold text-white text-sm">{match.requesterPhone}</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setShowChatModal(true)}
+                  onClick={() => setChatMatch(match)}
                   className="btn-secondary !py-2 !px-3 text-xs font-bold flex items-center gap-1"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
                   <span>Chat</span>
                 </button>
+                <button
+                  onClick={() => handleToggleSharing(match)}
+                  className="btn-secondary !py-2 !px-3 text-xs font-bold flex items-center gap-1"
+                >
+                  <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{sharingMatchId === match.matchId ? 'Stop Sharing' : 'Share Location'}</span>
+                </button>
                 <a
-                  href={`tel:${acceptedContactInfo.requesterPhone}`}
+                  href={`tel:${match.requesterPhone}`}
                   className="btn-emerald !py-2 !px-3 text-xs font-bold flex items-center gap-1"
                 >
                   <PhoneCall className="w-3.5 h-3.5" />
@@ -324,7 +354,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
             </div>
           </div>
         </div>
-      )}
+      ))}
 
       {/* Profile & Live Availability Bar */}
       <div className="glass-panel p-6 sm:p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
@@ -397,12 +427,12 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
             <Flame className="w-5 h-5 text-red-500 animate-pulse" />
             <span>Incoming Emergency Blood Alerts ({pendingMatches.length})</span>
           </h2>
-          <span className="text-xs text-slate-400">Private PIN-code match</span>
+          <span className="text-xs text-slate-400">Updates live</span>
         </div>
 
         {pendingMatches.length === 0 ? (
           <div className="glass-panel p-8 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">
-            No active emergency blood requests in your PIN code right now. You will be notified instantly when a matching patient needs blood.
+            No emergency requests for you right now. New ones appear here as soon as they are raised.
           </div>
         ) : (
           <div className="space-y-4">
@@ -414,24 +444,23 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3.5">
                     <div className="w-12 h-12 rounded-xl bg-red-600 border border-red-400 text-white font-black text-base flex items-center justify-center shadow-lg">
-                      {match.donorBloodGroup || 'O+'}
+                      {match.requestedBloodGroup}
                     </div>
                     <div>
                       <div className="text-sm font-black text-white flex items-center gap-2">
                         <span>🚨 HemoGo Blood Emergency</span>
                         <span className="text-[10px] uppercase font-bold bg-red-950 text-red-400 border border-red-800 px-2 py-0.5 rounded">
-                          Urgent Dispatch
+                          {match.urgency}
                         </span>
                       </div>
                       <p className="text-xs text-slate-300 mt-0.5">
-                        A patient urgently requires <strong>{match.donorBloodGroup || 'O+'} Blood</strong> at {match.requestDetails?.hospitalName || 'Care Hospital, Waltair Main Rd'} (PIN: <strong>{match.donorPinCode || '530016'}</strong>)
+                        A patient needs <strong>{match.requestedBloodGroup} blood</strong> ({match.unitsRequired} unit{match.unitsRequired === 1 ? '' : 's'}) at {match.hospitalName} (PIN: <strong>{match.hospitalPinCode}</strong>). You can give {match.donorBloodGroup}.
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right text-[11px] text-slate-400">
-                    <div>Match Score: <strong>{match.priorityScore || 100}/100</strong></div>
-                    <div className="text-amber-400 font-semibold">{match.locationMatch === 'SAME_PIN' ? 'Exact PIN Match' : 'Neighboring PIN'}</div>
+                    <div className="text-amber-400 font-semibold">{match.locationMatch === 'SAME_PIN' ? 'Your PIN' : 'Near your PIN'}</div>
                   </div>
                 </div>
 
@@ -479,19 +508,19 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
 
             <div className="grid grid-cols-4 gap-2 text-center text-xs">
               <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                <div className="text-xl font-bold text-white">{donor.totalRequestsReceived || 12}</div>
+                <div className="text-xl font-bold text-white">{donor.totalRequestsReceived}</div>
                 <div className="text-[10px] text-slate-400">Received</div>
               </div>
               <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                <div className="text-xl font-bold text-emerald-400">{donor.totalAccepted || 8}</div>
+                <div className="text-xl font-bold text-emerald-400">{donor.totalAccepted}</div>
                 <div className="text-[10px] text-slate-400">Accepted</div>
               </div>
               <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                <div className="text-xl font-bold text-slate-400">{donor.totalRejected || 1}</div>
+                <div className="text-xl font-bold text-slate-400">{donor.totalRejected}</div>
                 <div className="text-[10px] text-slate-400">Rejected</div>
               </div>
               <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                <div className="text-xl font-bold text-red-400">{donor.totalCompleted || 6}</div>
+                <div className="text-xl font-bold text-red-400">{donor.totalCompleted}</div>
                 <div className="text-[10px] text-slate-400">Completed</div>
               </div>
             </div>
@@ -501,7 +530,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
             onClick={() => setShowDonationHistory(true)}
             className="w-full btn-secondary !py-2 text-xs font-bold justify-center"
           >
-            <span>View Verified Donation Records</span>
+            <span>View Donation Records</span>
           </button>
         </div>
 
@@ -618,17 +647,17 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
       )}
 
       {/* In-App Chat Modal for Donor with Requester */}
-      {showChatModal && acceptedContactInfo && (
+      {chatMatch && (
         <EmergencyChatModal
           isOpen={true}
-          requestId={acceptedContactInfo.requestId || 'HG10245'}
-          matchId={acceptedContactInfo.matchId || 'match_001'}
-          patientName={acceptedContactInfo.patientName}
-          hospitalName={acceptedContactInfo.hospitalName}
-          otherPartyName={acceptedContactInfo.patientName}
-          otherPartyPhone={acceptedContactInfo.requesterPhone}
+          requestId={chatMatch.requestId}
+          matchId={chatMatch.matchId}
+          patientName={chatMatch.patientName || ''}
+          hospitalName={chatMatch.hospitalName}
+          otherPartyName={chatMatch.patientName || 'Requester'}
+          otherPartyPhone={chatMatch.requesterPhone || ''}
           currentUser={currentUser}
-          onClose={() => setShowChatModal(false)}
+          onClose={() => setChatMatch(null)}
         />
       )}
 
@@ -645,9 +674,6 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         isOpen={showSettingsModal}
         donor={donor}
         onClose={() => setShowSettingsModal(false)}
-        onProfileUpdated={(updated) => {
-          setDonor(updated);
-        }}
       />
 
       {/* HemoGo Premium GST Tax Invoice Receipt Modal */}

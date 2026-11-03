@@ -4,10 +4,14 @@ import {
   Flame, 
   AlertTriangle, 
   Send, 
-  ArrowLeft
+  ArrowLeft,
+  MapPin,
+  RefreshCw
 } from 'lucide-react';
 import type { BloodGroup, UrgencyLevel, BloodRequest, UserProfile } from '../../types/database';
 import { createEmergencyBloodRequest } from '../../services/emergencyService';
+import { findNearbyHospitals, type NearbyHospital } from '../../services/hospitalService';
+import { getCurrentPosition } from '../../services/locationService';
 
 interface EmergencyRequestModalProps {
   isOpen: boolean;
@@ -28,14 +32,16 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
 }) => {
   const [step, setStep] = useState<'form' | 'confirm'>('form');
 
-  const [patientName, setPatientName] = useState('Kavitha Ramachandran (Age 32)');
-  const [requesterPhone, setRequesterPhone] = useState(currentUser?.phone || '+91 99887 76655');
+  const [patientName, setPatientName] = useState('');
   const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O+');
-  const [hospitalName, setHospitalName] = useState('Care Hospital, Waltair Main Rd');
-  const [hospitalPinCode, setHospitalPinCode] = useState('530016');
-  const [unitsRequired, setUnitsRequired] = useState<number>(2);
+  const [hospitalName, setHospitalName] = useState('');
+  const [hospitalPinCode, setHospitalPinCode] = useState('');
+  const [hospitalCoords, setHospitalCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearby, setNearby] = useState<NearbyHospital[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [unitsRequired, setUnitsRequired] = useState<number>(1);
   const [urgency, setUrgency] = useState<UrgencyLevel>('critical');
-  const [notes, setNotes] = useState('Emergency cesarean delivery with severe hemorrhage. Urgent blood units needed.');
+  const [notes, setNotes] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,16 +61,34 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
       setError('Please provide the patient/requester name.');
       return;
     }
-    if (!requesterPhone.trim()) {
-      setError('Please provide a valid contact number.');
-      return;
-    }
-    if (!hospitalName.trim() || !hospitalPinCode.trim()) {
-      setError('Hospital name and 6-digit PIN code are required for matching.');
+    if (!hospitalName.trim() || !/^[1-9]\d{5}$/.test(hospitalPinCode.trim())) {
+      setError('Hospital name and a valid 6-digit PIN code are required for matching.');
       return;
     }
 
     setStep('confirm');
+  };
+
+  const handleFindNearby = async () => {
+    setError(null);
+    setSearching(true);
+    try {
+      const { lat, lng } = await getCurrentPosition();
+      const hospitals = await findNearbyHospitals(lat, lng);
+      setNearby(hospitals);
+      if (hospitals.length === 0) setError('No hospitals found nearby. Please enter the hospital manually.');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleChooseHospital = (hospital: NearbyHospital) => {
+    setHospitalName(hospital.name);
+    setHospitalPinCode(hospital.pinCode);
+    setHospitalCoords({ lat: hospital.lat, lng: hospital.lng });
+    setNearby([]);
   };
 
   const handleRaiseEmergencyRequest = async () => {
@@ -74,12 +98,12 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
 
     try {
       const result = await createEmergencyBloodRequest({
-        requesterId: currentUser.userId,
         patientName,
-        requesterPhone,
         bloodGroup,
         hospitalName,
-        hospitalPinCode,
+        hospitalPinCode: hospitalPinCode.trim(),
+        hospitalLat: hospitalCoords?.lat ?? null,
+        hospitalLng: hospitalCoords?.lng ?? null,
         unitsRequired,
         urgency,
         notes
@@ -117,7 +141,7 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
           </h2>
           <p className="text-xs text-slate-400 mt-1">
             {step === 'form'
-              ? 'Our matching engine will instantly notify nearby compatible donors in your hospital PIN code.'
+              ? 'We will alert compatible donors near the hospital straight away. Your verified number is shared only with a donor who accepts.'
               : 'Please double-check the critical details before broadcasting the alert.'}
           </p>
         </div>
@@ -141,7 +165,7 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Kavitha R."
+                  placeholder="Patient name"
                   value={patientName}
                   onChange={(e) => setPatientName(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
@@ -185,6 +209,32 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
               </div>
             </div>
 
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleFindNearby}
+                disabled={searching}
+                className="w-full btn-secondary !py-2.5 text-xs font-bold justify-center flex items-center gap-2"
+              >
+                {searching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4 text-red-400" />}
+                <span>{searching ? 'Finding hospitals...' : 'Find hospitals near me'}</span>
+              </button>
+              <p className="text-[10px] text-slate-400">
+                Your location is sent to OpenStreetMap only for this search. Call the hospital to confirm it has a blood bank before travelling.
+              </p>
+              {nearby.map((hospital) => (
+                <button
+                  key={`${hospital.name}-${hospital.lat}`}
+                  type="button"
+                  onClick={() => handleChooseHospital(hospital)}
+                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 hover:border-red-500 text-left text-xs flex items-center justify-between gap-2"
+                >
+                  <span className="font-semibold text-white">{hospital.name}{hospital.hasBloodBank ? ' • Blood bank' : ''}</span>
+                  <span className="text-slate-400 flex-shrink-0">{hospital.distanceKm} km</span>
+                </button>
+              ))}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -193,9 +243,9 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Care Hospital"
+                  placeholder="Hospital name"
                   value={hospitalName}
-                  onChange={(e) => setHospitalName(e.target.value)}
+                  onChange={(e) => { setHospitalName(e.target.value); setHospitalCoords(null); }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
                 />
               </div>
@@ -208,7 +258,7 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
                   type="text"
                   required
                   maxLength={6}
-                  placeholder="530016"
+                  placeholder="6-digit PIN"
                   value={hospitalPinCode}
                   onChange={(e) => setHospitalPinCode(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-red-500"
@@ -216,22 +266,7 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Emergency Phone Contact
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="+91 99887 76655"
-                  value={requesterPhone}
-                  onChange={(e) => setRequesterPhone(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
-                />
-              </div>
-
-              <div>
+            <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Urgency
                 </label>
@@ -244,7 +279,6 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
                   <option value="urgent">⏱️ Urgent (&lt; 12 Hours)</option>
                   <option value="moderate">📅 Moderate (&lt; 24-48 Hours)</option>
                 </select>
-              </div>
             </div>
 
             <div>
@@ -285,7 +319,7 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
 
                 <div>
                   <div className="text-[11px] text-slate-400">Units Required</div>
-                  <div className="text-2xl font-black text-white">{unitsRequired} Units</div>
+                  <div className="text-2xl font-black text-white">{unitsRequired} Unit{unitsRequired === 1 ? '' : 's'}</div>
                 </div>
 
                 <div>
@@ -301,7 +335,7 @@ export const EmergencyRequestModal: React.FC<EmergencyRequestModalProps> = ({
 
               <div className="text-[11px] text-slate-400 flex items-center justify-between">
                 <span>Patient: <strong>{patientName}</strong></span>
-                <span>Contact: <strong>{requesterPhone}</strong></span>
+                <span>Contact: <strong>{currentUser?.phone}</strong></span>
               </div>
             </div>
 

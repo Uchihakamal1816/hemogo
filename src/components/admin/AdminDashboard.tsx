@@ -9,10 +9,11 @@ import {
   Receipt,
   AlertTriangle
 } from 'lucide-react';
-import type { DonorProfile, BloodRequest, UserProfile, SubscriptionRecord } from '../../types/database';
-import { getStoredMockDonors, adminVerifyDonor, adminRevokeDonor } from '../../services/donorService';
-import { getStoredRequests, getStoredMatches } from '../../services/emergencyService';
-import { getStoredSubscriptions } from '../../services/razorpayService';
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import type { AuditLog, DonorProfile, BloodRequest, MatchRecord, UserProfile, SubscriptionRecord } from '../../types/database';
+import { subscribeToAllDonors, adminVerifyDonor, adminRevokeDonor } from '../../services/donorService';
+import { subscribeToAllSubscriptions } from '../../services/razorpayService';
 import { PremiumReceiptModal } from '../premium/PremiumReceiptModal';
 
 interface AdminDashboardProps {
@@ -34,15 +35,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [verificationFilter, setVerificationFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED'>('ALL');
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAdminData();
-  }, []);
+  const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const isAdmin = currentUser?.role === 'admin';
 
-  const loadAdminData = () => {
-    setDonors(getStoredMockDonors());
-    setRequests(getStoredRequests());
-    setSubscriptions(getStoredSubscriptions());
-  };
+  useEffect(() => {
+    if (!isAdmin) return;
+    const onError = (err: Error) => console.error('Admin listener failed:', err);
+    const stops = [
+      subscribeToAllDonors(setDonors),
+      subscribeToAllSubscriptions(setSubscriptions),
+      onSnapshot(query(collection(db, 'bloodRequests'), orderBy('createdAt', 'desc'), limit(200)),
+        (snap) => setRequests(snap.docs.map((d) => d.data() as BloodRequest)), onError),
+      onSnapshot(query(collection(db, 'matches'), orderBy('createdAt', 'desc'), limit(500)),
+        (snap) => setMatches(snap.docs.map((d) => d.data() as MatchRecord)), onError),
+      onSnapshot(query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(50)),
+        (snap) => setAuditLogs(snap.docs.map((d) => ({ ...d.data(), logId: d.id }) as AuditLog)), onError)
+    ];
+    return () => stops.forEach((stop) => stop());
+  }, [isAdmin]);
 
   if (!currentUser || currentUser.role !== 'admin') {
     return (
@@ -50,16 +61,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <Lock className="w-12 h-12 text-amber-400 mx-auto" />
         <h2 className="text-xl font-bold text-white">Administrator Portal Access</h2>
         <p className="text-xs text-slate-400">
-          This portal is restricted to authorized HemoGo administrators. Please sign in as an administrator to proceed.
+          This portal is restricted to authorized HemoGo administrators. Please sign in with an administrator account.
         </p>
         <button onClick={onOpenAuth} className="btn-primary w-full justify-center text-xs font-bold">
-          Switch to Admin Persona
+          Sign In
         </button>
       </div>
     );
   }
 
-  const matches = getStoredMatches();
   const samePinMatches = matches.filter(m => m.locationMatch === 'SAME_PIN').length;
   const neighborPinMatches = matches.filter(m => m.locationMatch === 'NEIGHBOR_PIN').length;
   const premiumMatches = matches.filter(m => m.isPremiumDonor).length;
@@ -67,9 +77,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleVerify = async (donorId: string) => {
     try {
-      const updated = await adminVerifyDonor(donorId);
-      setActionFeedback(`Verified donor "${updated.name}" successfully.`);
-      loadAdminData();
+      await adminVerifyDonor(donorId);
+      setActionFeedback('Donor verified.');
       setTimeout(() => setActionFeedback(null), 3000);
     } catch (err: any) {
       alert(err.message || 'Verification failed');
@@ -78,9 +87,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleRevoke = async (donorId: string) => {
     try {
-      const updated = await adminRevokeDonor(donorId);
-      setActionFeedback(`Revoked verification for "${updated.name}".`);
-      loadAdminData();
+      await adminRevokeDonor(donorId);
+      setActionFeedback('Verification revoked.');
       setTimeout(() => setActionFeedback(null), 3000);
     } catch (err: any) {
       alert(err.message || 'Revoke failed');
@@ -254,18 +262,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </h3>
 
               <div className="space-y-2 text-xs text-slate-400 font-mono">
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                  [12:30:10] MATCH_DISPATCH: Request #HG10245 sent to 8 donors in PIN 530016
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                  [12:35:45] SCREENING_PASSED: Donor #demo_donor_001 completed 6/6 health declarations
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                  [12:35:46] CONTACT_REVEAL: Mutual contacts shared between Req #demo_req_001 & Donor #demo_donor_001
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                  [12:40:22] PREVENT_SCRAPE: Anonymous query on /donors blocked by Firestore Rule #2
-                </div>
+                {auditLogs.length === 0 && <div className="p-2.5 text-slate-500">No activity yet.</div>}
+                {auditLogs.map((log) => (
+                  <div key={log.logId} className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                    [{new Date(log.timestamp).toLocaleTimeString()}] {log.action}: {log.targetResource} {log.details}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -282,7 +284,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Filter by PIN Code (e.g. 530016)"
+                  placeholder="Filter by PIN Code"
                   value={searchPin}
                   onChange={(e) => setSearchPin(e.target.value)}
                   className="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"

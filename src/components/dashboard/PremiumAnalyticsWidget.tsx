@@ -1,15 +1,11 @@
 import React from 'react';
 import { 
   Zap, 
-  TrendingUp, 
   ShieldCheck, 
-  Award, 
   Receipt, 
-  Clock, 
   Crown
 } from 'lucide-react';
 import type { DonorProfile, SubscriptionRecord } from '../../types/database';
-import { getDonorSearchAnalytics } from '../../services/donorService';
 
 interface PremiumAnalyticsWidgetProps {
   donor: DonorProfile;
@@ -24,43 +20,19 @@ export const PremiumAnalyticsWidget: React.FC<PremiumAnalyticsWidgetProps> = ({
   onOpenReceipt,
   onOpenUpgradeModal
 }) => {
-  const analytics = getDonorSearchAnalytics(donor);
-
   if (!donor.premiumStatus) {
     return (
       <div className="glass-panel p-6 rounded-2xl border border-amber-900/60 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/20 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Crown className="w-5 h-5 text-amber-400" />
-            <h3 className="font-bold text-white text-base">HemoGo Premium Priority Telemetry</h3>
+            <h3 className="font-bold text-white text-base">HemoGo Premium</h3>
           </div>
-          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800">
-            Preview Mode
-          </span>
         </div>
 
         <p className="text-xs text-slate-300 leading-relaxed">
-          Unlock Priority 1 dispatch boost in PIN <strong>{donor.pinCode}</strong>, instant SMS/WhatsApp alerts, verified donor badge, and official donation certificates for ₹299/year.
+          Be listed first when a request matches your PIN <strong>{donor.pinCode}</strong>, and have your own requests widen their search every 2 minutes instead of 5, for ₹299/year.
         </p>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-            <div className="text-lg font-black text-slate-400">Standard</div>
-            <div className="text-[10px] text-slate-500">Dispatch Priority</div>
-          </div>
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-            <div className="text-lg font-black text-slate-400">Regular</div>
-            <div className="text-[10px] text-slate-500">SMS Dispatch Speed</div>
-          </div>
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-            <div className="text-lg font-black text-slate-400">Basic</div>
-            <div className="text-[10px] text-slate-500">Profile Badge</div>
-          </div>
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-            <div className="text-lg font-black text-amber-400">₹299/yr</div>
-            <div className="text-[10px] text-slate-400">Full Coverage</div>
-          </div>
-        </div>
 
         <button
           onClick={onOpenUpgradeModal}
@@ -84,14 +56,11 @@ export const PremiumAnalyticsWidget: React.FC<PremiumAnalyticsWidgetProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-black text-white text-base">HemoGo Premium Impact Telemetry</h3>
+              <h3 className="font-black text-white text-base">HemoGo Premium</h3>
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800">
-                ★ Priority 1 Active
+                Active
               </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Your profile is ranked in the top {100 - analytics.rankingPercentile}% in your PIN code
-            </p>
           </div>
         </div>
 
@@ -106,45 +75,22 @@ export const PremiumAnalyticsWidget: React.FC<PremiumAnalyticsWidgetProps> = ({
         )}
       </div>
 
-      {/* Analytics Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        
+      <div className="grid grid-cols-3 gap-3 text-xs">
         <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold mb-1">
-            <span>Impressions</span>
+            <span>Alerts</span>
             <Zap className="w-3.5 h-3.5 text-amber-400" />
           </div>
-          <div className="text-xl font-black text-white">{analytics.totalSearchImpressions}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Emergency Searches</div>
+          <div className="text-xl font-black text-white">{donor.totalRequestsReceived}</div>
         </div>
-
         <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold mb-1">
-            <span>Priority #1 Rank</span>
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-          <div className="text-xl font-black text-emerald-400">{analytics.priorityRankOneImpressions}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Rank Boost Matches</div>
+          <div className="text-slate-400 text-[10px] uppercase font-bold mb-1">Accepted</div>
+          <div className="text-xl font-black text-emerald-400">{donor.totalAccepted}</div>
         </div>
-
         <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold mb-1">
-            <span>Response Speed</span>
-            <Clock className="w-3.5 h-3.5 text-blue-400" />
-          </div>
-          <div className="text-xl font-black text-blue-400">{analytics.averageResponseTimeMinutes}m</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Avg Response Time</div>
+          <div className="text-slate-400 text-[10px] uppercase font-bold mb-1">Donated</div>
+          <div className="text-xl font-black text-red-400">{donor.totalCompleted}</div>
         </div>
-
-        <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold mb-1">
-            <span>Lifesaver Tier</span>
-            <Award className="w-3.5 h-3.5 text-amber-400" />
-          </div>
-          <div className="text-base font-black text-amber-400">{analytics.badgeLevel}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Top {100 - analytics.rankingPercentile}% Regionally</div>
-        </div>
-
       </div>
 
       {/* Expiry Banner */}
@@ -153,7 +99,7 @@ export const PremiumAnalyticsWidget: React.FC<PremiumAnalyticsWidgetProps> = ({
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
             <span>
-              Your ₹299/yr coverage is valid until{' '}
+              Your membership is valid until{' '}
               <strong className="text-white">
                 {new Date(donor.premiumExpiry).toLocaleDateString('en-IN', {
                   day: 'numeric',
@@ -164,7 +110,6 @@ export const PremiumAnalyticsWidget: React.FC<PremiumAnalyticsWidgetProps> = ({
             </span>
           </div>
 
-          <span className="text-[10px] text-amber-400 font-bold">Auto-Renews Annually</span>
         </div>
       )}
 

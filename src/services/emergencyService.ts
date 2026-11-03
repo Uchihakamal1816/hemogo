@@ -1,246 +1,66 @@
-import type { 
-  BloodRequest, 
-  MatchRecord, 
-  BloodGroup, 
-  UrgencyLevel, 
-  PreliminaryScreening 
+import { httpsCallable } from 'firebase/functions';
+import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { db, functions } from '../config/firebase';
+import type {
+  BloodRequest,
+  MatchRecord,
+  BloodGroup,
+  UrgencyLevel,
+  PreliminaryScreening
 } from '../types/database';
-import { getStoredMockDonors } from './donorService';
 
-const MOCK_REQUESTS_KEY = 'hemogo_mock_requests_v3';
-const MOCK_MATCHES_KEY = 'hemogo_mock_matches_v3';
+export const ACTIVE_REQUEST_STATUSES = ['SEARCHING', 'DONORS_NOTIFIED', 'CONTACT_SHARED'];
 
-export const INITIAL_DEMO_REQUESTS: BloodRequest[] = [];
-
-export const INITIAL_DEMO_MATCHES: MatchRecord[] = [];
-
-export function clearEmergencyStorage(): void {
-  localStorage.removeItem(MOCK_REQUESTS_KEY);
-  localStorage.removeItem(MOCK_MATCHES_KEY);
-  localStorage.removeItem('hemogo_mock_requests_v2');
-  localStorage.removeItem('hemogo_mock_matches_v2');
-}
-
-export function getStoredRequests(): BloodRequest[] {
-  const saved = localStorage.getItem(MOCK_REQUESTS_KEY);
-  if (!saved) {
-    localStorage.setItem(MOCK_REQUESTS_KEY, JSON.stringify(INITIAL_DEMO_REQUESTS));
-    return INITIAL_DEMO_REQUESTS;
-  }
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return INITIAL_DEMO_REQUESTS;
-  }
-}
-
-export function saveStoredRequests(list: BloodRequest[]) {
-  localStorage.setItem(MOCK_REQUESTS_KEY, JSON.stringify(list));
-}
-
-export function getStoredMatches(): MatchRecord[] {
-  const saved = localStorage.getItem(MOCK_MATCHES_KEY);
-  if (!saved) {
-    localStorage.setItem(MOCK_MATCHES_KEY, JSON.stringify(INITIAL_DEMO_MATCHES));
-    return INITIAL_DEMO_MATCHES;
-  }
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return INITIAL_DEMO_MATCHES;
-  }
-}
-
-export function saveStoredMatches(list: MatchRecord[]) {
-  localStorage.setItem(MOCK_MATCHES_KEY, JSON.stringify(list));
-}
-
-/**
- * Creates an emergency blood request and triggers the server-side donor matching engine
- */
 export async function createEmergencyBloodRequest(data: {
-  requesterId: string;
   patientName: string;
-  requesterPhone: string;
   bloodGroup: BloodGroup;
   hospitalName: string;
   hospitalPinCode: string;
+  hospitalLat?: number | null;
+  hospitalLng?: number | null;
   unitsRequired: number;
   urgency: UrgencyLevel;
   notes?: string;
 }): Promise<{ request: BloodRequest; notifiedCount: number }> {
-  const requestId = `HG${Math.floor(10000 + Math.random() * 90000)}`;
-  const nowIso = new Date().toISOString();
-  const expiresIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-  // Run matching simulation
-  const allDonors = getStoredMockDonors().filter(d => d.availability === 'available');
-  const neighborPins = ['530013', '530017', '530020', '560034', '560008', '600102'];
-  
-  const createdMatches: MatchRecord[] = [];
-  let notifiedCount = 0;
-
-  allDonors.forEach((donor) => {
-    const isSamePin = donor.pinCode === data.hospitalPinCode;
-    const isNeighbor = neighborPins.includes(donor.pinCode);
-
-    if (!isSamePin && !isNeighbor) return;
-
-    let priorityScore = 0;
-    const locationMatch = isSamePin ? 'SAME_PIN' : 'NEIGHBOR_PIN';
-
-    if (donor.premiumStatus && isSamePin) priorityScore = 100;
-    else if (donor.premiumStatus && isNeighbor) priorityScore = 80;
-    else if (!donor.premiumStatus && isSamePin) priorityScore = 60;
-    else if (!donor.premiumStatus && isNeighbor) priorityScore = 40;
-
-    const newMatch: MatchRecord = {
-      matchId: `match_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      requestId,
-      donorId: donor.donorId,
-      donorName: donor.name,
-      donorPhone: donor.phone,
-      donorBloodGroup: donor.bloodGroup,
-      donorPinCode: donor.pinCode,
-      isPremiumDonor: donor.premiumStatus,
-      priorityScore,
-      locationMatch,
-      notificationStatus: 'DELIVERED',
-      response: 'PENDING',
-      createdAt: nowIso
-    };
-
-    createdMatches.push(newMatch);
-    notifiedCount++;
-  });
-
-  const newRequest: BloodRequest = {
-    requestId,
-    requesterId: data.requesterId,
-    patientName: data.patientName,
-    requesterPhone: data.requesterPhone,
-    bloodGroup: data.bloodGroup,
-    hospitalName: data.hospitalName,
-    hospitalPinCode: data.hospitalPinCode,
-    unitsRequired: data.unitsRequired,
-    urgency: data.urgency,
-    notes: data.notes,
-    status: notifiedCount > 0 ? 'DONORS_NOTIFIED' : 'SEARCHING',
-    notifiedDonorsCount: notifiedCount,
-    acceptedDonorsCount: 0,
-    rejectedDonorsCount: 0,
-    createdAt: nowIso,
-    updatedAt: nowIso,
-    expiresAt: expiresIso
-  };
-
-  // Save to stored state
-  const requests = getStoredRequests();
-  requests.unshift(newRequest);
-  saveStoredRequests(requests);
-
-  const matches = getStoredMatches();
-  saveStoredMatches([...createdMatches, ...matches]);
-
-  return {
-    request: newRequest,
-    notifiedCount
-  };
+  const fn = httpsCallable<typeof data, { request: BloodRequest; notifiedCount: number }>(functions, 'createBloodRequest');
+  return (await fn(data)).data;
 }
 
-/**
- * Fetch matches for a specific blood request (used by requester to see accepted donors)
- */
-export function getMatchesForRequest(requestId: string): MatchRecord[] {
-  const matches = getStoredMatches();
-  return matches.filter(m => m.requestId === requestId);
+export function subscribeToMyRequests(userId: string, callback: (requests: BloodRequest[]) => void): () => void {
+  const q = query(collection(db, 'bloodRequests'), where('requesterId', '==', userId), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snap) => callback(snap.docs.map((d) => d.data() as BloodRequest)),
+    (err) => console.error('Request listener failed:', err));
 }
 
-/**
- * Fetch pending notifications/matches sent to a specific donor
- */
-export function getPendingMatchesForDonor(donorId: string): (MatchRecord & { requestDetails?: BloodRequest })[] {
-  const matches = getStoredMatches().filter(m => (m.donorId === donorId || donorId === 'demo_donor_001') && m.response === 'PENDING');
-  const requests = getStoredRequests();
-
-  return matches.map(m => ({
-    ...m,
-    requestDetails: requests.find(r => r.requestId === m.requestId) || requests[0]
-  }));
+export function subscribeToRequestMatches(requestId: string, userId: string, callback: (matches: MatchRecord[]) => void): () => void {
+  const q = query(collection(db, 'matches'), where('requestId', '==', requestId), where('requesterId', '==', userId));
+  return onSnapshot(q, (snap) => callback(snap.docs.map((d) => d.data() as MatchRecord)),
+    (err) => console.error('Match listener failed:', err));
 }
 
-/**
- * Handles donor accepting a request with preliminary medical screening
- */
-export async function acceptMatchWithScreening(
-  donorId: string,
-  matchId: string,
-  screening: PreliminaryScreening
-): Promise<{ success: boolean; request: BloodRequest }> {
-  const matches = getStoredMatches();
-  const match = matches.find(m => m.matchId === matchId && (m.donorId === donorId || donorId === 'demo_donor_001'));
-  if (!match) throw new Error('Match record not found.');
-
-  const nowIso = new Date().toISOString();
-  match.response = 'ACCEPTED';
-  match.respondedAt = nowIso;
-  match.eligibilityScreening = screening;
-  saveStoredMatches(matches);
-
-  const requests = getStoredRequests();
-  const req = requests.find(r => r.requestId === match.requestId) || requests[0];
-  if (!req) throw new Error('Blood request not found.');
-
-  req.status = 'CONTACT_SHARED';
-  req.acceptedDonorsCount = (req.acceptedDonorsCount || 0) + 1;
-  req.updatedAt = nowIso;
-  saveStoredRequests(requests);
-
-  return { success: true, request: req };
+/** Live alerts and accepted requests for a donor. */
+export function subscribeToDonorMatches(donorId: string, callback: (matches: MatchRecord[]) => void): () => void {
+  const q = query(collection(db, 'matches'), where('donorId', '==', donorId), where('response', 'in', ['PENDING', 'ACCEPTED']));
+  return onSnapshot(q, (snap) => callback(snap.docs.map((d) => d.data() as MatchRecord)),
+    (err) => console.error('Donor match listener failed:', err));
 }
 
-/**
- * Handles donor rejecting a request
- */
-export async function rejectMatch(donorId: string, matchId: string): Promise<void> {
-  const matches = getStoredMatches();
-  const match = matches.find(m => m.matchId === matchId && (m.donorId === donorId || donorId === 'demo_donor_001'));
-  if (match) {
-    match.response = 'REJECTED';
-    match.respondedAt = new Date().toISOString();
-    saveStoredMatches(matches);
-
-    const requests = getStoredRequests();
-    const req = requests.find(r => r.requestId === match.requestId);
-    if (req) {
-      req.rejectedDonorsCount = (req.rejectedDonorsCount || 0) + 1;
-      saveStoredRequests(requests);
-    }
-  }
+export async function acceptMatchWithScreening(matchId: string, screeningResponses: Omit<PreliminaryScreening, 'confirmedAt'>): Promise<void> {
+  await httpsCallable(functions, 'acceptBloodRequest')({ matchId, screeningResponses });
 }
 
-/**
- * Mark blood request as fulfilled
- */
+export async function rejectMatch(matchId: string): Promise<void> {
+  await httpsCallable(functions, 'rejectBloodRequest')({ matchId });
+}
+
 export async function markRequestFulfilled(requestId: string): Promise<void> {
-  const requests = getStoredRequests();
-  const req = requests.find(r => r.requestId === requestId);
-  if (req) {
-    req.status = 'FULFILLED';
-    req.updatedAt = new Date().toISOString();
-    saveStoredRequests(requests);
-  }
+  await httpsCallable(functions, 'closeBloodRequest')({ requestId, outcome: 'FULFILLED' });
 }
 
-/**
- * Cancel a blood request
- */
 export async function cancelBloodRequest(requestId: string): Promise<void> {
-  const requests = getStoredRequests();
-  const req = requests.find(r => r.requestId === requestId);
-  if (req) {
-    req.status = 'CANCELLED';
-    req.updatedAt = new Date().toISOString();
-    saveStoredRequests(requests);
-  }
+  await httpsCallable(functions, 'closeBloodRequest')({ requestId, outcome: 'CANCELLED' });
+}
+
+export async function confirmDonation(matchId: string): Promise<void> {
+  await httpsCallable(functions, 'confirmDonationCompleted')({ matchId });
 }

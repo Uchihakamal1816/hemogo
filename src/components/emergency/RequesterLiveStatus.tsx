@@ -5,6 +5,7 @@ import {
   CheckCircle2, 
   UserCheck, 
   RefreshCw, 
+  BellOff,
   XCircle, 
   PhoneCall,
   MessageSquare,
@@ -14,10 +15,12 @@ import {
 import confetti from 'canvas-confetti';
 import type { BloodRequest, MatchRecord, UserProfile } from '../../types/database';
 import { 
-  getStoredRequests, 
-  getMatchesForRequest, 
+  ACTIVE_REQUEST_STATUSES,
+  cancelBloodRequest,
+  confirmDonation,
   markRequestFulfilled, 
-  cancelBloodRequest 
+  subscribeToMyRequests,
+  subscribeToRequestMatches
 } from '../../services/emergencyService';
 import { EmergencyChatModal } from '../chat/EmergencyChatModal';
 import { DonorLiveTracker } from './DonorLiveTracker';
@@ -43,43 +46,59 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
   const [activeTrackerMatch, setActiveTrackerMatch] = useState<MatchRecord | null>(null);
   const [showPastEmergencies, setShowPastEmergencies] = useState(false);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+  const userId = currentUser?.userId;
+
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!userId) return;
+    return subscribeToMyRequests(userId, (list) => {
+      // Open requests first, then the most recent closed ones.
+      const open = list.filter((r) => ACTIVE_REQUEST_STATUSES.includes(r.status));
+      setRequests(open.length > 0 ? open : list.slice(0, 1));
+    });
+  }, [userId]);
 
-  const loadData = () => {
-    const allReqs = getStoredRequests();
-    setRequests(allReqs);
+  const currentRequestId = requests.find((r) => r.requestId === selectedRequestId)?.requestId || requests[0]?.requestId;
 
-    if (allReqs.length > 0) {
-      const activeId = selectedRequestId || allReqs[0].requestId;
-      if (!selectedRequestId) setSelectedRequestId(activeId);
-      const reqMatches = getMatchesForRequest(activeId);
-      setMatches(reqMatches);
+  useEffect(() => {
+    if (!userId || !currentRequestId) {
+      setMatches([]);
+      return;
     }
-  };
+    return subscribeToRequestMatches(currentRequestId, userId, setMatches);
+  }, [userId, currentRequestId]);
 
   const handleSelectRequest = (reqId: string) => {
     setSelectedRequestId(reqId);
-    setMatches(getMatchesForRequest(reqId));
   };
 
-  const handleFulfill = async (reqId: string) => {
+  const runAction = async (action: () => Promise<void>) => {
+    setActionError(null);
+    try {
+      await action();
+    } catch (err: any) {
+      setActionError(err.message || 'That did not work. Please try again.');
+    }
+  };
+
+  const handleFulfill = (reqId: string) => runAction(async () => {
     await markRequestFulfilled(reqId);
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 }
     });
-    loadData();
+  });
+
+  const handleCancel = (reqId: string) => {
+    if (confirm('Are you sure you want to cancel this emergency request?')) {
+      runAction(() => cancelBloodRequest(reqId));
+    }
   };
 
-  const handleCancel = async (reqId: string) => {
-    if (confirm('Are you sure you want to cancel this emergency request?')) {
-      await cancelBloodRequest(reqId);
-      loadData();
+  const handleConfirmDonation = (matchId: string) => {
+    if (confirm('Confirm this donor gave blood? This starts their 90-day recovery period.')) {
+      runAction(() => confirmDonation(matchId));
     }
   };
 
@@ -120,7 +139,7 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
     );
   }
 
-  const currentReq = requests.find(r => r.requestId === selectedRequestId) || requests[0];
+  const currentReq = requests.find(r => r.requestId === currentRequestId) || requests[0];
   const acceptedMatches = matches.filter(m => m.response === 'ACCEPTED');
   const pendingMatches = matches.filter(m => m.response === 'PENDING');
 
@@ -136,7 +155,7 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
                 key={r.requestId}
                 onClick={() => handleSelectRequest(r.requestId)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  r.requestId === selectedRequestId
+                  r.requestId === currentRequestId
                     ? 'bg-red-600 text-white shadow-md'
                     : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                 }`}
@@ -174,7 +193,7 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
             </div>
             
             <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-2">
-              <span>{currentReq.unitsRequired} Units of {currentReq.bloodGroup} Blood</span>
+              <span>{currentReq.unitsRequired} Unit{currentReq.unitsRequired === 1 ? '' : 's'} of {currentReq.bloodGroup} Blood</span>
             </h1>
 
             <p className="text-xs text-slate-400 flex items-center gap-2">
@@ -195,6 +214,11 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-bold">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>REQUEST FULFILLED</span>
+              </span>
+            ) : currentReq.status === 'EXPIRED' ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-slate-400 text-xs font-bold">
+                <XCircle className="w-4 h-4" />
+                <span>EXPIRED</span>
               </span>
             ) : currentReq.status === 'CANCELLED' ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-slate-400 text-xs font-bold">
@@ -219,7 +243,8 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
         <div className="grid grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
             <div className="text-2xl sm:text-3xl font-black text-white">{currentReq.notifiedDonorsCount}</div>
-            <div className="text-[11px] text-slate-400 font-semibold mt-0.5">Suitable Donors Notified</div>
+            <div className="text-[11px] text-slate-400 font-semibold mt-0.5">Donors Matched</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">{currentReq.pushDeliveredCount || 0} push alerts delivered</div>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
@@ -233,6 +258,19 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
           </div>
         </div>
 
+        {currentReq.notifiedDonorsCount === 0 && ACTIVE_REQUEST_STATUSES.includes(currentReq.status) && (
+          <div className="p-4 rounded-xl bg-amber-950/80 border border-amber-700 text-amber-200 text-xs flex items-start gap-2">
+            <BellOff className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+            <span>
+              No compatible donors found near this hospital yet. We keep widening the search, but please also call the hospital blood bank or <a href="tel:104" className="font-bold underline">104</a> now.
+            </span>
+          </div>
+        )}
+
+        {actionError && (
+          <div className="p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs">{actionError}</div>
+        )}
+
         {/* Donors Who Accepted Cards with In-App Chat & GPS Tracker Buttons */}
         <div className="space-y-4 pt-2">
           <div className="flex items-center justify-between">
@@ -241,14 +279,14 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
               <span>Donors Who Accepted Your Request ({acceptedMatches.length})</span>
             </h2>
             <span className="text-xs text-slate-400">
-              Verified after 6-question medical screening
+              Passed preliminary screening. The blood bank makes the final check.
             </span>
           </div>
 
           {acceptedMatches.length === 0 ? (
             <div className="p-8 rounded-xl bg-slate-950/60 border border-slate-800 text-center text-xs text-slate-400 space-y-2">
               <RefreshCw className="w-6 h-6 animate-spin mx-auto text-red-500" />
-              <div className="font-semibold text-slate-300">We're actively contacting suitable donors in PIN {currentReq.hospitalPinCode}</div>
+              <div className="font-semibold text-slate-300">Searching for donors around PIN {currentReq.hospitalPinCode} (search level {currentReq.searchTier + 1} of 4)</div>
               <p className="text-[11px]">As soon as a donor accepts and completes screening, their contact and live chat will unlock here.</p>
             </div>
           ) : (
@@ -304,7 +342,7 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
                       <button
                         onClick={() => setActiveTrackerMatch(match)}
                         className="p-2 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 text-xs font-bold flex items-center gap-1 transition-all"
-                        title="Live GPS & ETA Tracker"
+                        title="Donor location"
                       >
                         <Navigation className="w-3.5 h-3.5 text-emerald-400" />
                         <span className="hidden sm:inline">ETA</span>
@@ -319,6 +357,20 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
                       </a>
                     </div>
                   </div>
+
+                  {match.donationConfirmedAt ? (
+                    <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Donation confirmed</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleConfirmDonation(match.matchId)}
+                      className="btn-secondary !py-2 text-xs font-bold justify-center"
+                    >
+                      This donor gave blood
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -326,7 +378,7 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
         </div>
 
         {/* Action Controls for Requester */}
-        {currentReq.status !== 'FULFILLED' && currentReq.status !== 'CANCELLED' && (
+        {ACTIVE_REQUEST_STATUSES.includes(currentReq.status) && (
           <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
             <button
               onClick={() => handleCancel(currentReq.requestId)}
@@ -357,8 +409,8 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
           matchId={activeChatMatch.matchId}
           patientName={currentReq.patientName}
           hospitalName={currentReq.hospitalName}
-          otherPartyName={activeChatMatch.donorName}
-          otherPartyPhone={activeChatMatch.donorPhone}
+          otherPartyName={activeChatMatch.donorName || 'Donor'}
+          otherPartyPhone={activeChatMatch.donorPhone || ''}
           currentUser={currentUser}
           onClose={() => setActiveChatMatch(null)}
         />
@@ -368,11 +420,9 @@ export const RequesterLiveStatus: React.FC<RequesterLiveStatusProps> = ({
       {activeTrackerMatch && (
         <DonorLiveTracker
           isOpen={true}
-          donorId={activeTrackerMatch.donorId}
-          requestId={currentReq.requestId}
           matchId={activeTrackerMatch.matchId}
-          donorName={activeTrackerMatch.donorName}
-          donorPhone={activeTrackerMatch.donorPhone}
+          donorName={activeTrackerMatch.donorName || 'Donor'}
+          donorPhone={activeTrackerMatch.donorPhone || ''}
           hospitalName={currentReq.hospitalName}
           onClose={() => setActiveTrackerMatch(null)}
           onOpenChat={() => {
