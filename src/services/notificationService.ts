@@ -1,11 +1,12 @@
 import { arrayUnion, doc, setDoc } from 'firebase/firestore';
-import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { app, db, firebaseConfig, useEmulators } from '../config/firebase';
 
 export type PushState = 'unsupported' | 'default' | 'granted' | 'denied';
 
 export async function getPushState(): Promise<PushState> {
-  if (useEmulators || !(await isSupported().catch(() => false))) return 'unsupported';
+  if (useEmulators) return 'unsupported';
+  const { isSupported } = await import('firebase/messaging');
+  if (!(await isSupported().catch(() => false))) return 'unsupported';
   return Notification.permission as PushState;
 }
 
@@ -24,6 +25,7 @@ export async function enablePushAlerts(userId: string): Promise<void> {
     appId: firebaseConfig.appId
   });
   const serviceWorkerRegistration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${params}`);
+  const { getMessaging, getToken, onMessage } = await import('firebase/messaging');
   const messaging = getMessaging(app);
   const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
   await setDoc(doc(db, 'deviceTokens', userId), { tokens: arrayUnion(token), updatedAt: new Date().toISOString() }, { merge: true });

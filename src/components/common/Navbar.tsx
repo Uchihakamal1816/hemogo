@@ -20,6 +20,7 @@ interface NavbarProps {
   currentUser: UserProfile | null;
   activeTab: 'home' | 'requester_status' | 'donor_dashboard' | 'admin';
   setActiveTab: (tab: 'home' | 'requester_status' | 'donor_dashboard' | 'admin') => void;
+  sessionReady: boolean;
   onOpenAuth: () => void;
   onOpenRegisterDonor: () => void;
   onOpenCreateEmergency: () => void;
@@ -33,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   activeTab,
   setActiveTab,
+  sessionReady,
   onOpenAuth,
   onOpenRegisterDonor,
   onOpenCreateEmergency,
@@ -42,7 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme
 }) => {
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 dark:border-slate-800 bg-white/85 dark:bg-slate-950/90 backdrop-blur-md px-4 lg:px-8 py-3 transition-colors">
+    <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 dark:border-slate-800 bg-white/85 dark:bg-slate-950/90 px-4 lg:px-8 py-3 transition-colors">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
         {/* Brand */}
@@ -190,6 +192,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
+          ) : !sessionReady ? (
+            <div className="w-20 h-8" aria-hidden="true" />
           ) : (
             <button
               onClick={onOpenAuth}

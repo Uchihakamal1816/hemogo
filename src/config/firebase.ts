@@ -2,7 +2,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
-import { getAnalytics, isSupported } from 'firebase/analytics';
 
 export const useEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
 
@@ -29,7 +28,7 @@ if (useEmulators) {
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
   auth.settings.appVerificationDisabledForTesting = true;
 } else if (isFirebaseConfigured && typeof window !== 'undefined') {
-  isSupported().then((supported) => {
-    if (supported) getAnalytics(app);
+  import('firebase/analytics').then(async ({ getAnalytics, isSupported }) => {
+    if (await isSupported()) getAnalytics(app);
   }).catch(() => {});
 }

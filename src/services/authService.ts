@@ -42,7 +42,10 @@ async function ensureUserProfile(uid: string, phone: string): Promise<void> {
 }
 
 /** Follows the signed-in user and their live profile. Calls back with null when signed out. */
-export function subscribeToSession(callback: (user: UserProfile | null) => void): () => void {
+export function subscribeToSession(
+  callback: (user: UserProfile | null) => void,
+  onError: (message: string) => void
+): () => void {
   let stopProfile: (() => void) | null = null;
 
   const stopAuth = onAuthStateChanged(auth, (fbUser) => {
@@ -59,9 +62,15 @@ export function subscribeToSession(callback: (user: UserProfile | null) => void)
         callback(snap.data() as UserProfile);
       } else if (!creating) {
         creating = true;
-        ensureUserProfile(fbUser.uid, fbUser.phoneNumber || '').catch(console.error);
+        ensureUserProfile(fbUser.uid, fbUser.phoneNumber || '').catch((err) => {
+          console.error('Profile creation failed:', err);
+          onError('You are signed in, but we could not set up your profile. Please reload and try again.');
+        });
       }
-    }, (err) => console.error('Profile listener failed:', err));
+    }, (err) => {
+      console.error('Profile listener failed:', err);
+      onError('We could not load your profile. Please check your connection and reload.');
+    });
   });
 
   return () => {

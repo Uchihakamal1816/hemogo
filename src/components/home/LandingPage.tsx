@@ -28,7 +28,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     <div className="space-y-20 pb-20">
       
       {/* Hero Section */}
-      <section className="glass-panel p-8 sm:p-12 lg:p-16 relative overflow-hidden bg-white/60 dark:bg-slate-950/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-3xl shadow-xl shadow-slate-200/30 dark:shadow-none transition-colors">
+      <section className="glass-panel p-8 sm:p-12 lg:p-16 relative overflow-hidden bg-white/60 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl shadow-xl shadow-slate-200/30 dark:shadow-none transition-colors">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-red-500/10 dark:bg-red-600/10 rounded-full blur-[120px] pointer-events-none"></div>
         <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-red-400/10 dark:bg-red-500/10 rounded-full blur-[100px] pointer-events-none"></div>
 
@@ -69,15 +69,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Core Privacy & Technology Pillars */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-6 pt-3 text-xs sm:text-sm">
-            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm backdrop-blur-sm">
+            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
               <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Zero-Scrape Privacy</span>
             </span>
-            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm backdrop-blur-sm">
+            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
               <MapPin className="w-4 h-4 text-red-600 dark:text-red-400" />
               <span>PIN-Code Matching</span>
             </span>
-            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm backdrop-blur-sm">
+            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
               <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>OTP Verified</span>
             </span>
