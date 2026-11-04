@@ -8,7 +8,6 @@ import {
   LogIn, 
   Sparkles, 
   RefreshCw,
-  Droplet,
   Radio,
   Sliders,
   Sun,
@@ -23,7 +22,6 @@ interface NavbarProps {
   activeTab: 'home' | 'requester_status' | 'donor_dashboard' | 'admin';
   setActiveTab: (tab: 'home' | 'requester_status' | 'donor_dashboard' | 'admin') => void;
   onOpenAuth: () => void;
-  onOpenRegisterDonor: () => void;
   onOpenCreateEmergency: () => void;
   onOpenPremium: () => void;
   onSelectPresetUser: (presetKey: keyof typeof DEMO_PRESET_USERS) => void;
@@ -37,7 +35,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   onOpenAuth,
-  onOpenRegisterDonor,
   onOpenCreateEmergency,
   onOpenPremium,
   onSelectPresetUser,
@@ -138,14 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Request Blood</span>
           </button>
 
-          {/* Become a Donor CTA */}
-          <button
-            onClick={onOpenRegisterDonor}
-            className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/80 hover:bg-emerald-600 hover:text-white font-bold text-xs transition-all"
-          >
-            <Droplet className="w-3.5 h-3.5" />
-            <span>Join Donors</span>
-          </button>
+          
 
           {/* Premium Status or Upgrade */}
           {currentUser?.premiumStatus ? (

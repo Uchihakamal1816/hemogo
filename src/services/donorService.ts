@@ -3,7 +3,8 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions, isDemoMode } from '../config/firebase';
 import type { 
   DonorProfile, 
-  DonorAvailability 
+  DonorAvailability, 
+  BloodGroup 
 } from '../types/database';
 
 const MOCK_DONORS_KEY = 'hemogo_mock_donors_v3';
@@ -149,7 +150,44 @@ export async function registerDonorProfile(profile: DonorProfile): Promise<Donor
   return profile;
 }
 
-export async function getDonorProfile(donorId: string): Promise<DonorProfile | null> {
+export function ensureDonorProfile(
+  user: { userId: string; name?: string; phone?: string; pinCode?: string; email?: string; premiumStatus?: boolean },
+  preferredBloodGroup: BloodGroup = 'O+'
+): DonorProfile {
+  const donors = getStoredMockDonors();
+  let existing = donors.find(d => d.donorId === user.userId || d.userId === user.userId);
+  if (!existing) {
+    const newDonor: DonorProfile = {
+      donorId: user.userId,
+      userId: user.userId,
+      name: user.name || 'HemoGo Donor',
+      phone: user.phone || '+91 98765 43210',
+      bloodGroup: preferredBloodGroup,
+      pinCode: user.pinCode || '530016',
+      email: user.email,
+      availability: 'available',
+      verificationStatus: true,
+      premiumStatus: user.premiumStatus || false,
+      lastDonationDate: null,
+      cooldownUntil: null,
+      totalRequestsReceived: 0,
+      totalAccepted: 0,
+      totalRejected: 0,
+      totalCompleted: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    donors.push(newDonor);
+    saveMockDonors(donors);
+    return newDonor;
+  }
+  return existing;
+}
+
+export async function getDonorProfile(
+  donorId: string,
+  currentUser?: { userId: string; name?: string; phone?: string; pinCode?: string; email?: string; premiumStatus?: boolean } | null
+): Promise<DonorProfile | null> {
   if (!isDemoMode) {
     try {
       const fetchPromise = getDoc(doc(db, 'donors', donorId));
@@ -168,7 +206,27 @@ export async function getDonorProfile(donorId: string): Promise<DonorProfile | n
   if (found) return found;
 
   const init = INITIAL_DEMO_DONORS.find(d => d.donorId === donorId || d.userId === donorId);
-  return init || null;
+  if (init) {
+    donors.push({ ...init });
+    saveMockDonors(donors);
+    return init;
+  }
+
+  // Whoever signs in automatically becomes a donor
+  if (currentUser && (currentUser.userId === donorId || !donorId)) {
+    return ensureDonorProfile(currentUser);
+  }
+  try {
+    const raw = localStorage.getItem('hemogo_demo_user');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed.userId === donorId || !donorId)) {
+        return ensureDonorProfile(parsed);
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 export function getCooldownStatus(donor: DonorProfile): {
@@ -250,7 +308,7 @@ export async function toggleDonorAvailability(
 
 export async function updateDonorSettings(
   donorId: string,
-  updates: Partial<Pick<DonorProfile, 'name' | 'phone' | 'alternatePhone' | 'city' | 'pinCode' | 'email' | 'notificationPreferences' | 'preferredRadiusKm'>>
+  updates: Partial<Pick<DonorProfile, 'name' | 'phone' | 'alternatePhone' | 'city' | 'pinCode' | 'email' | 'bloodGroup' | 'notificationPreferences' | 'preferredRadiusKm'>>
 ): Promise<DonorProfile> {
   const donors = getStoredMockDonors();
   let idx = donors.findIndex(d => d.donorId === donorId || d.userId === donorId);

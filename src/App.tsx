@@ -16,7 +16,6 @@ import { Navbar } from './components/common/Navbar';
 import { LandingPage } from './components/home/LandingPage';
 import { BackgroundErythrocyteCanvas3D } from './components/3d/BackgroundErythrocyteCanvas3D';
 import { PhoneAuthModal } from './components/auth/PhoneAuthModal';
-import { DonorRegisterModal } from './components/onboarding/DonorRegisterModal';
 import { EmergencyRequestModal } from './components/onboarding/EmergencyRequestModal';
 import { RequesterLiveStatus } from './components/emergency/RequesterLiveStatus';
 import { DonorDashboard } from './components/dashboard/DonorDashboard';
@@ -30,7 +29,6 @@ export const App: React.FC = () => {
   
   // Modals
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showRegisterDonorModal, setShowRegisterDonorModal] = useState(false);
   const [showCreateEmergencyModal, setShowCreateEmergencyModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
@@ -100,7 +98,6 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenAuth={() => setShowAuthModal(true)}
-        onOpenRegisterDonor={() => setShowRegisterDonorModal(true)}
         onOpenCreateEmergency={() => setShowCreateEmergencyModal(true)}
         onOpenPremium={() => setShowPremiumModal(true)}
         onSelectPresetUser={handleSelectPreset}
@@ -118,10 +115,6 @@ export const App: React.FC = () => {
             onOpenCreateEmergency={() => {
               if (!currentUser) setShowAuthModal(true);
               else setShowCreateEmergencyModal(true);
-            }}
-            onOpenRegisterDonor={() => {
-              if (!currentUser) setShowAuthModal(true);
-              else setShowRegisterDonorModal(true);
             }}
             onOpenPremium={() => {
               if (!currentUser) setShowAuthModal(true);
@@ -146,7 +139,6 @@ export const App: React.FC = () => {
         {activeTab === 'donor_dashboard' && (
           <DonorDashboard
             currentUser={currentUser}
-            onOpenRegister={() => setShowRegisterDonorModal(true)}
             onOpenAuth={() => setShowAuthModal(true)}
             onOpenPremium={() => setShowPremiumModal(true)}
           />
@@ -173,7 +165,8 @@ export const App: React.FC = () => {
             <span>— Emergency Blood Connection Platform</span>
           </div>
 
-          <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400 flex-wrap">`r`n            <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-semibold">
+          <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400 flex-wrap">
+            <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-semibold">
               <Phone className="w-3.5 h-3.5" />
               24/7 Emergency Line: 108 / 104
             </span>
@@ -197,19 +190,6 @@ export const App: React.FC = () => {
         onClose={() => setShowAuthModal(false)}
         onSuccess={(user) => {
           setCurrentUser(user);
-        }}
-      />
-
-      <DonorRegisterModal
-        isOpen={showRegisterDonorModal}
-        currentUser={currentUser}
-        onClose={() => setShowRegisterDonorModal(false)}
-        onSuccess={() => {
-          setActiveTab('donor_dashboard');
-        }}
-        onPromptLogin={() => {
-          setShowRegisterDonorModal(false);
-          setShowAuthModal(true);
         }}
       />
 

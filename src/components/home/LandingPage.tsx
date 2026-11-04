@@ -4,7 +4,6 @@ import {
   ShieldCheck, 
   MapPin, 
   Sparkles, 
-  Droplet, 
   Crown, 
   AlertTriangle,
   Lock,
@@ -16,13 +15,11 @@ import { BloodMatrix3D } from '../3d/BloodMatrix3D';
 
 interface LandingPageProps {
   onOpenCreateEmergency: () => void;
-  onOpenRegisterDonor: () => void;
   onOpenPremium: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenCreateEmergency,
-  onOpenRegisterDonor,
   onOpenPremium
 }) => {
   return (
@@ -59,13 +56,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <ArrowRight className="w-4 h-4 text-red-200 group-hover:translate-x-1 transition-transform" />
             </button>
 
-            <button
-              onClick={onOpenRegisterDonor}
-              className="btn-emerald !py-4 !px-8 text-base font-extrabold shadow-2xl shadow-emerald-600/30 dark:shadow-emerald-950/90 flex items-center gap-2.5 cursor-pointer"
-            >
-              <Droplet className="w-5 h-5 fill-white" />
-              <span>BECOME A DONOR</span>
-            </button>
+            
           </div>
 
           {/* Core Privacy & Technology Pillars */}

@@ -1,3 +1,4 @@
+import { ensureDonorProfile } from './donorService';
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
@@ -128,7 +129,9 @@ export async function verifyPhoneOtp(
 
   const phone = fallbackPhone || '+91 98765 43210';
   const mockUid = `user_${phone.replace(/\D/g, '').slice(-6)}`;
-  return getOrCreateMockUser(mockUid, phone, pinCode, role);
+  const user = getOrCreateMockUser(mockUid, phone, pinCode, role);
+  ensureDonorProfile(user);
+  return user;
 }
 
 export async function getOrCreateUserProfile(
@@ -160,6 +163,7 @@ export async function getOrCreateUserProfile(
     };
 
     await setDoc(userDocRef, newUser);
+    ensureDonorProfile(newUser);
     return newUser;
   } catch (err) {
     console.error('Error in getOrCreateUserProfile:', err);
@@ -198,12 +202,14 @@ export function getOrCreateMockUser(
   };
 
   localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(newUser));
+  ensureDonorProfile(newUser);
   return newUser;
 }
 
 export function setDemoUserPreset(presetKey: keyof typeof DEMO_PRESET_USERS): UserProfile {
   const user = DEMO_PRESET_USERS[presetKey];
   localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(user));
+  ensureDonorProfile(user);
   return user;
 }
 

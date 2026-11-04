@@ -3,7 +3,6 @@ import {
   ShieldCheck, 
   Clock, 
   Flame, 
-  Heart, 
   CheckCircle2, 
   AlertCircle, 
   MapPin, 
@@ -45,14 +44,12 @@ import type { SubscriptionRecord } from '../../types/database';
 
 interface DonorDashboardProps {
   currentUser: UserProfile | null;
-  onOpenRegister: () => void;
   onOpenAuth: () => void;
   onOpenPremium: () => void;
 }
 
 export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   currentUser,
-  onOpenRegister,
   onOpenAuth,
   onOpenPremium
 }) => {
@@ -95,7 +92,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
     }
 
     try {
-      const profile = await getDonorProfile(currentUser.userId);
+      const profile = await getDonorProfile(currentUser.userId, currentUser);
       setDonor(profile);
       if (profile) {
         const matches = getPendingMatchesForDonor(profile.donorId || currentUser.userId);
@@ -226,16 +223,10 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   }
 
   if (!donor) {
-    return (
-      <div className="max-w-xl mx-auto my-12 p-8 glass-panel-elevated text-center space-y-4">
-        <Heart className="w-12 h-12 text-red-500 fill-red-500 mx-auto" />
-        <h2 className="text-2xl font-bold text-white">You are not registered as a Donor yet</h2>
-        <p className="text-xs text-slate-400 max-w-md mx-auto">
-          Complete your 1-minute donor profile to start receiving emergency requests in your PIN code area.
-        </p>
-        <button onClick={onOpenRegister} className="btn-primary !py-3 !px-6 text-sm font-bold mx-auto">
-          <span>Register as Blood Donor</span>
-        </button>
+      return (
+      <div className="max-w-4xl mx-auto py-16 text-center text-slate-400">
+        <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-red-500" />
+        <p className="text-sm">Activating your donor dispatch profile...</p>
       </div>
     );
   }
