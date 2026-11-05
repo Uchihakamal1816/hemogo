@@ -46,7 +46,8 @@ const FIT = {
   takingMedications: false, previousDecline: false, willingForBloodBankScreening: true
 };
 const PIN = `56${unique.slice(0, 4)}`;
-const FAR_PIN = `${PIN.slice(0, 3)}${(Number(PIN.slice(3)) + 1) % 1000}`.padEnd(6, '0');
+// Same first five digits, so the first widening of the search always reaches this donor.
+const FAR_PIN = `${PIN.slice(0, 5)}${(Number(PIN[5]) + 1) % 10}`;
 
 let requester, nearDonor, farDonor, stranger, requestId, matchId;
 
