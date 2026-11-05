@@ -1,58 +1,70 @@
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import type { DonorLiveLocation } from '../types/database';
 
-/**
- * Computes distance in kilometers between two GPS coordinates using the Haversine formula
- */
-export function calculateHaversineDistanceKm(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
+const MIN_WRITE_INTERVAL_MS = 15000;
+
+export function calculateHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 10) / 10;
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
 }
 
-export function getInitialDonorLocation(data: {
-  donorId: string;
-  requestId: string;
-  matchId: string;
-  donorName: string;
-  hospitalName: string;
-}): DonorLiveLocation {
-  // Care Hospital coordinates (Visakhapatnam 530016)
-  const hospitalLat = 17.7215;
-  const hospitalLng = 83.3082;
-  // Donor simulated starting coordinates (~2.8 km away)
-  const currentLat = 17.7380;
-  const currentLng = 83.3220;
+export function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Location is not available on this device.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => reject(new Error('Could not get your location. Please allow location access or enter the hospital manually.')),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+}
 
-  const distanceKm = calculateHaversineDistanceKm(currentLat, currentLng, hospitalLat, hospitalLng);
-  const estimatedMinutes = Math.max(2, Math.round(distanceKm * 3.5)); // ~3.5 min per km
+/** Shares the donor's real position with the requester until the returned function is called. */
+export function startSharingLocation(
+  match: { matchId: string; donorId: string; requestId: string; hospitalLat?: number | null; hospitalLng?: number | null },
+  onError: (message: string) => void
+): () => void {
+  let lastWrite = 0;
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      if (Date.now() - lastWrite < MIN_WRITE_INTERVAL_MS) return;
+      lastWrite = Date.now();
 
-  return {
-    donorId: data.donorId,
-    requestId: data.requestId,
-    matchId: data.matchId,
-    donorName: data.donorName,
-    hospitalName: data.hospitalName,
-    currentLat,
-    currentLng,
-    hospitalLat,
-    hospitalLng,
-    distanceKm,
-    estimatedMinutes,
-    transportMode: 'bike',
-    status: 'en_route',
-    lastUpdated: new Date().toISOString()
-  };
+      const { latitude: currentLat, longitude: currentLng } = pos.coords;
+      const hasHospital = match.hospitalLat != null && match.hospitalLng != null;
+      const distanceKm = hasHospital
+        ? calculateHaversineDistanceKm(currentLat, currentLng, match.hospitalLat!, match.hospitalLng!)
+        : null;
+      const update: DonorLiveLocation = {
+        donorId: match.donorId,
+        requestId: match.requestId,
+        matchId: match.matchId,
+        currentLat,
+        currentLng,
+        distanceKm,
+        estimatedMinutes: distanceKm === null ? null : Math.max(1, Math.round(distanceKm * 3.5)),
+        status: distanceKm === null ? 'en_route' : distanceKm < 0.15 ? 'arrived' : distanceKm < 0.8 ? 'nearby' : 'en_route',
+        lastUpdated: new Date().toISOString()
+      };
+      setDoc(doc(db, 'locations', match.matchId), update).catch(() => onError('Could not share your location.'));
+    },
+    () => onError('Location access was denied, so your location is not being shared.'),
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+  );
+  return () => navigator.geolocation.clearWatch(watchId);
+}
+
+export function subscribeToLocation(matchId: string, callback: (location: DonorLiveLocation | null) => void): () => void {
+  return onSnapshot(doc(db, 'locations', matchId), (snap) => {
+    callback(snap.exists() ? (snap.data() as DonorLiveLocation) : null);
+  }, (err) => console.error('Location listener failed:', err));
 }

@@ -1,36 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useRef, useState, useEffect } from 'react';
 import { 
   HeartHandshake, 
   Phone
 } from 'lucide-react';
 import type { UserProfile } from './types/database';
-import { 
-  getCurrentSessionUser, 
-  logoutUser, 
-  type DEMO_PRESET_USERS, 
-  setDemoUserPreset 
-} from './services/authService';
+import { subscribeToSession, logoutUser } from './services/authService';
+import { auth, isFirebaseConfigured } from './config/firebase';
 import { parseDeepLinkRoute } from './services/deepLinkService';
 import { initTheme, toggleTheme, type ThemeMode } from './services/themeService';
 import { Navbar } from './components/common/Navbar';
 import { LandingPage } from './components/home/LandingPage';
-import { BackgroundErythrocyteCanvas3D } from './components/3d/BackgroundErythrocyteCanvas3D';
 import { PhoneAuthModal } from './components/auth/PhoneAuthModal';
+import { DonorRegisterModal } from './components/onboarding/DonorRegisterModal';
 import { EmergencyRequestModal } from './components/onboarding/EmergencyRequestModal';
-import { RequesterLiveStatus } from './components/emergency/RequesterLiveStatus';
-import { DonorDashboard } from './components/dashboard/DonorDashboard';
-import { AdminDashboard } from './components/admin/AdminDashboard';
 import { PremiumModal } from './components/premium/PremiumModal';
+
+// three.js is heavy, so emergency screens must not wait for the decorative background.
+const BackgroundErythrocyteCanvas3D = lazy(() =>
+  import('./components/3d/BackgroundErythrocyteCanvas3D').then((m) => ({ default: m.BackgroundErythrocyteCanvas3D }))
+);
+
+const RequesterLiveStatus = lazy(() =>
+  import('./components/emergency/RequesterLiveStatus').then((m) => ({ default: m.RequesterLiveStatus }))
+);
+const DonorDashboard = lazy(() =>
+  import('./components/dashboard/DonorDashboard').then((m) => ({ default: m.DonorDashboard }))
+);
+const AdminDashboard = lazy(() =>
+  import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+);
+
+type AppTab = 'home' | 'requester_status' | 'donor_dashboard' | 'admin';
+
+// Phones and low-end machines get the plain background so the app stays responsive.
+function canRunBackground3D(): boolean {
+  const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
+  return !window.matchMedia('(pointer: coarse), (max-width: 767px), (prefers-reduced-motion: reduce)').matches &&
+    !nav.connection?.saveData &&
+    (nav.hardwareConcurrency || 8) > 4 &&
+    (nav.deviceMemory || 8) > 4;
+}
+
+const PageLoading: React.FC = () => (
+  <div className="py-24 flex justify-center" role="status" aria-label="Loading">
+    <div className="w-8 h-8 rounded-full border-2 border-red-500 border-t-transparent animate-spin" />
+  </div>
+);
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<'home' | 'requester_status' | 'donor_dashboard' | 'admin'>('home');
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [activeTab, setActiveTabState] = useState<AppTab>(() => parseDeepLinkRoute().tab || 'home');
+  const [show3D, setShow3D] = useState(false);
+  const pendingAfterLogin = useRef<(() => void) | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => initTheme());
   
   // Modals
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showRegisterDonorModal, setShowRegisterDonorModal] = useState(false);
   const [showCreateEmergencyModal, setShowCreateEmergencyModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+
+  const setActiveTab = (tab: AppTab) => {
+    if (tab === activeTab) return;
+    setActiveTabState(tab);
+    window.history.pushState(null, '', tab === 'home' ? '/' : `/?tab=${tab}`);
+    window.scrollTo(0, 0);
+  };
+
+  // Signing in should carry on to what the person was trying to do.
+  const requireLogin = (action: () => void) => {
+    if (currentUser) {
+      action();
+    } else {
+      pendingAfterLogin.current = action;
+      setShowAuthModal(true);
+    }
+  };
+
+  const openEmergency = () => requireLogin(() => setShowCreateEmergencyModal(true));
+  const openRegister = () => requireLogin(() => setShowRegisterDonorModal(true));
+  const openPremium = () => requireLogin(() => setShowPremiumModal(true));
 
   const handleToggleTheme = () => {
     const nextTheme = toggleTheme();
@@ -38,32 +89,45 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // One-time auto-wipe of legacy demo history for brand new experience
-    const CLEAN_STATE_KEY = 'hemogo_clean_state_v3';
-    if (!localStorage.getItem(CLEAN_STATE_KEY)) {
-      localStorage.removeItem('hemogo_past_emergencies');
-      localStorage.removeItem('hemogo_donation_records');
-      localStorage.removeItem('hemogo_mock_chats_v1');
-      localStorage.removeItem('hemogo_mock_requests_v2');
-      localStorage.removeItem('hemogo_mock_matches_v2');
-      localStorage.removeItem('hemogo_mock_donors_v2');
-      localStorage.removeItem('hemogo_demo_user');
-      localStorage.setItem(CLEAN_STATE_KEY, 'true');
-    }
+    const onPopState = () => {
+      setActiveTabState(parseDeepLinkRoute().tab || 'home');
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('popstate', onPopState);
 
-    // Check deep-link query parameters on launch
-    const deepLink = parseDeepLinkRoute();
-    if (deepLink.tab) {
-      setActiveTab(deepLink.tab);
-    }
+    // Start the decorative scene only after the page is ready to use.
+    const start3D = () => {
+      if (canRunBackground3D()) setShow3D(true);
+    };
+    const idleId = window.requestIdleCallback ? window.requestIdleCallback(start3D, { timeout: 2500 }) : window.setTimeout(start3D, 1500);
 
-    // Load active session user if logged in, otherwise stay as clean new visitor
-    const savedUser = getCurrentSessionUser();
-    if (savedUser) {
-      setCurrentUser(savedUser);
-    } else {
-      setCurrentUser(null);
-    }
+    // Fetch the other screens quietly so opening them feels instant.
+    const preload = window.setTimeout(() => {
+      import('./components/emergency/RequesterLiveStatus');
+      import('./components/dashboard/DonorDashboard');
+    }, 2000);
+
+    const stopSession = subscribeToSession((user) => {
+      setCurrentUser(user);
+      setSessionReady(true);
+      if (user) {
+        setSessionError(null);
+        const next = pendingAfterLogin.current;
+        pendingAfterLogin.current = null;
+        next?.();
+      }
+    }, (message) => {
+      setSessionError(message);
+      setSessionReady(true);
+    });
+
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idleId);
+      else window.clearTimeout(idleId);
+      window.clearTimeout(preload);
+      stopSession();
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -71,26 +135,27 @@ export const App: React.FC = () => {
     setCurrentUser(null);
   };
 
-  const handleSelectPreset = (key: keyof typeof DEMO_PRESET_USERS) => {
-    const user = setDemoUserPreset(key);
-    setCurrentUser(user);
-  };
-
-  const handleResetAllData = () => {
-    if (confirm('Are you sure you want to clear all data and start completely fresh?')) {
-      localStorage.clear();
-      localStorage.setItem('hemogo_clean_state_v3', 'true');
-      setCurrentUser(null);
-      setActiveTab('home');
-      window.location.reload();
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50/70 dark:bg-[#030712] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-red-600 selection:text-white transition-colors duration-300 relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50/70 dark:bg-[#030712] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-red-600 selection:text-white transition-colors duration-300 relative overflow-x-clip">
       
       {/* 3D Biological Background Canvas */}
-      <BackgroundErythrocyteCanvas3D theme={theme} />
+      {show3D && activeTab === 'home' && (
+        <Suspense fallback={null}>
+          <BackgroundErythrocyteCanvas3D theme={theme} />
+        </Suspense>
+      )}
+
+      {sessionError && (
+        <div role="alert" className="relative z-50 bg-amber-700 text-white text-xs font-bold text-center py-2 px-4">
+          {sessionError}
+        </div>
+      )}
+
+      {!isFirebaseConfigured && (
+        <div className="relative z-50 bg-red-700 text-white text-xs font-bold text-center py-2 px-4">
+          HemoGo is not configured. Set the Firebase values from .env.example and rebuild.
+        </div>
+      )}
 
       {/* Navbar */}
       <Navbar
@@ -98,64 +163,61 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenAuth={() => setShowAuthModal(true)}
-        onOpenCreateEmergency={() => setShowCreateEmergencyModal(true)}
-        onOpenPremium={() => setShowPremiumModal(true)}
-        onSelectPresetUser={handleSelectPreset}
+        sessionReady={sessionReady}
+        onOpenRegisterDonor={openRegister}
+        onOpenCreateEmergency={openEmergency}
+        onOpenPremium={openPremium}
         onLogout={handleLogout}
         theme={theme}
         onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Content View */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative">
         
         {/* Tab 1: Home Landing Page */}
         {activeTab === 'home' && (
           <LandingPage
-            onOpenCreateEmergency={() => {
-              if (!currentUser) setShowAuthModal(true);
-              else setShowCreateEmergencyModal(true);
-            }}
-            onOpenPremium={() => {
-              if (!currentUser) setShowAuthModal(true);
-              else setShowPremiumModal(true);
-            }}
+            onOpenCreateEmergency={openEmergency}
+            onOpenRegisterDonor={openRegister}
+            onOpenPremium={openPremium}
           />
         )}
 
-        {/* Tab 2: Requester Live Dispatch Status Page */}
-        {activeTab === 'requester_status' && (
-          <RequesterLiveStatus
-            currentUser={currentUser}
-            onOpenCreateEmergency={() => {
-              if (!currentUser) setShowAuthModal(true);
-              else setShowCreateEmergencyModal(true);
-            }}
-            onOpenAuth={() => setShowAuthModal(true)}
-          />
-        )}
+        {activeTab !== 'home' && !sessionReady && <PageLoading />}
 
-        {/* Tab 3: Donor Dashboard */}
-        {activeTab === 'donor_dashboard' && (
-          <DonorDashboard
-            currentUser={currentUser}
-            onOpenAuth={() => setShowAuthModal(true)}
-            onOpenPremium={() => setShowPremiumModal(true)}
-          />
-        )}
+        {activeTab !== 'home' && sessionReady && (
+          <Suspense fallback={<PageLoading />}>
+            {activeTab === 'requester_status' && (
+              <RequesterLiveStatus
+                currentUser={currentUser}
+                onOpenCreateEmergency={openEmergency}
+                onOpenAuth={() => setShowAuthModal(true)}
+              />
+            )}
 
-        {/* Tab 4: Admin Dashboard */}
-        {activeTab === 'admin' && (
-          <AdminDashboard
-            currentUser={currentUser}
-            onOpenAuth={() => setShowAuthModal(true)}
-          />
+            {activeTab === 'donor_dashboard' && (
+              <DonorDashboard
+                currentUser={currentUser}
+                onOpenRegister={openRegister}
+                onOpenAuth={() => setShowAuthModal(true)}
+                onOpenPremium={openPremium}
+              />
+            )}
+
+            {activeTab === 'admin' && (
+              <AdminDashboard
+                currentUser={currentUser}
+                onOpenAuth={() => setShowAuthModal(true)}
+              />
+            )}
+          </Suspense>
         )}
 
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/90 backdrop-blur-md py-8 px-4 text-xs text-slate-500 dark:text-slate-400 relative z-10 transition-colors">
+      <footer className="border-t border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/90 py-8 px-4 text-xs text-slate-500 dark:text-slate-400 relative z-10 transition-colors">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <HeartHandshake className="w-5 h-5 text-red-500" />
@@ -170,16 +232,7 @@ export const App: React.FC = () => {
               <Phone className="w-3.5 h-3.5" />
               24/7 Emergency Line: 108 / 104
             </span>
-            <span>•</span>
-            <span>Privacy Guarded • Firebase & Razorpay Powered</span>
-            <span>•</span>
-            <button 
-              onClick={handleResetAllData}
-              className="hover:text-red-400 transition-colors cursor-pointer text-[11px] underline"
-              title="Clear all stored data and reset app to brand new"
-            >
-              Reset App Data
-            </button>
+            <span>HemoGo connects people. Final donor eligibility is decided by the blood bank.</span>
           </div>
         </div>
       </footer>
@@ -187,9 +240,25 @@ export const App: React.FC = () => {
       {/* Modals */}
       <PhoneAuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={(user) => {
-          setCurrentUser(user);
+        onClose={() => {
+          setShowAuthModal(false);
+          // A closed dialog with no sign-in abandons the pending action.
+          setTimeout(() => {
+            if (!auth.currentUser) pendingAfterLogin.current = null;
+          }, 0);
+        }}
+      />
+
+      <DonorRegisterModal
+        isOpen={showRegisterDonorModal}
+        currentUser={currentUser}
+        onClose={() => setShowRegisterDonorModal(false)}
+        onSuccess={() => {
+          setActiveTab('donor_dashboard');
+        }}
+        onPromptLogin={() => {
+          setShowRegisterDonorModal(false);
+          setShowAuthModal(true);
         }}
       />
 
@@ -210,9 +279,6 @@ export const App: React.FC = () => {
         isOpen={showPremiumModal}
         currentUser={currentUser}
         onClose={() => setShowPremiumModal(false)}
-        onSuccess={(updatedUser) => {
-          setCurrentUser(updatedUser);
-        }}
         onPromptLogin={() => {
           setShowPremiumModal(false);
           setShowAuthModal(true);

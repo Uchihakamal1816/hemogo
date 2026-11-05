@@ -302,14 +302,14 @@ export const BloodCellCanvas3D: React.FC<BloodCellCanvas3DProps> = ({
       <div ref={mountRef} className="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing" />
 
       {/* Floating 3D Badge */}
-      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/85 dark:bg-slate-950/80 backdrop-blur-md border border-red-200 dark:border-red-500/30 text-[11px] font-bold text-red-700 dark:text-red-400 shadow-md pointer-events-none transition-colors">
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/85 dark:bg-slate-950/80 border border-red-200 dark:border-red-500/30 text-[11px] font-bold text-red-700 dark:text-red-400 shadow-md pointer-events-none transition-colors">
         <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
         <span className="tracking-wide">Interactive 3D Erythrocyte Specimen</span>
       </div>
 
       {/* Interactive Controls Overlay */}
       {showControls && (
-        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-950/85 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl opacity-90 hover:opacity-100 transition-all">
+        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-950/85 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl opacity-90 hover:opacity-100 transition-all">
           <button
             onClick={() => setIsRotating(!isRotating)}
             className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${

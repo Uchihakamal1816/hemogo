@@ -144,11 +144,11 @@ export const BloodMatrix3D: React.FC = () => {
                   className={`p-2.5 rounded-xl text-center text-xs font-bold transition-all ${
                     isCompatible
                       ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/80 shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-800/40 opacity-40'
+                      : 'bg-slate-100 dark:bg-slate-900/40 text-slate-600 dark:text-slate-500 border border-slate-200 dark:border-slate-800/40 opacity-70'
                   }`}
                 >
                   <div className="font-black text-sm">{bg}</div>
-                  <div className="text-[9px] mt-0.5">{isCompatible ? '✓ Compatible' : '✗ Incompatible'}</div>
+                  <div className="text-[9px] mt-0.5 leading-tight"><span aria-hidden="true">{isCompatible ? '✓' : '✗'}</span><span className="hidden sm:inline"> {isCompatible ? 'Compatible' : 'Incompatible'}</span><span className="sr-only sm:hidden">{isCompatible ? 'Compatible' : 'Incompatible'}</span></div>
                 </div>
               );
             })}
@@ -176,11 +176,11 @@ export const BloodMatrix3D: React.FC = () => {
                   className={`p-2.5 rounded-xl text-center text-xs font-bold transition-all ${
                     isCompatible
                       ? 'bg-blue-50 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700/80 shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-800/40 opacity-40'
+                      : 'bg-slate-100 dark:bg-slate-900/40 text-slate-600 dark:text-slate-500 border border-slate-200 dark:border-slate-800/40 opacity-70'
                   }`}
                 >
                   <div className="font-black text-sm">{bg}</div>
-                  <div className="text-[9px] mt-0.5">{isCompatible ? '✓ Compatible' : '✗ Incompatible'}</div>
+                  <div className="text-[9px] mt-0.5 leading-tight"><span aria-hidden="true">{isCompatible ? '✓' : '✗'}</span><span className="hidden sm:inline"> {isCompatible ? 'Compatible' : 'Incompatible'}</span><span className="sr-only sm:hidden">{isCompatible ? 'Compatible' : 'Incompatible'}</span></div>
                 </div>
               );
             })}

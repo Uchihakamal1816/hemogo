@@ -31,11 +31,6 @@ export interface DonorProfile {
   email?: string;
   alternatePhone?: string;
   city?: string;
-  notificationPreferences?: {
-    sms: boolean;
-    whatsapp: boolean;
-    push: boolean;
-  };
   preferredRadiusKm?: number;
   verificationDocumentType?: 'Aadhaar Card' | 'Driving License' | 'Donor Card';
   availability: DonorAvailability;
@@ -72,11 +67,16 @@ export interface BloodRequest {
   bloodGroup: BloodGroup;
   hospitalName: string;
   hospitalPinCode: string;
+  hospitalLat?: number | null;
+  hospitalLng?: number | null;
   unitsRequired: number;
   urgency: UrgencyLevel;
   notes?: string;
+  requesterIsPremium?: boolean;
   status: BloodRequestStatus;
+  searchTier: number;
   notifiedDonorsCount: number;
+  pushDeliveredCount: number;
   acceptedDonorsCount: number;
   rejectedDonorsCount: number;
   createdAt: string;
@@ -85,7 +85,7 @@ export interface BloodRequest {
 }
 
 export type LocationMatchTier = 'SAME_PIN' | 'NEIGHBOR_PIN' | 'RADIUS_EXPANDED';
-export type MatchResponse = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+export type MatchResponse = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'WITHDRAWN';
 
 export interface PreliminaryScreening {
   feelingWell: boolean;
@@ -100,19 +100,32 @@ export interface PreliminaryScreening {
 export interface MatchRecord {
   matchId: string;
   requestId: string;
+  requesterId: string;
   donorId: string;
-  donorName: string;
-  donorPhone: string;
   donorBloodGroup: BloodGroup;
   donorPinCode: string;
   isPremiumDonor: boolean;
   priorityScore: number;
   locationMatch: LocationMatchTier;
-  notificationStatus: 'SENT' | 'DELIVERED' | 'OPENED';
   response: MatchResponse;
   respondedAt?: string | null;
-  eligibilityScreening?: PreliminaryScreening | null;
   createdAt: string;
+  requestedBloodGroup: BloodGroup;
+  hospitalName: string;
+  hospitalPinCode: string;
+  hospitalLat?: number | null;
+  hospitalLng?: number | null;
+  unitsRequired: number;
+  urgency: UrgencyLevel;
+  // Written by the server only after the donor accepts.
+  donorName?: string;
+  donorPhone?: string;
+  patientName?: string;
+  requesterPhone?: string;
+  notes?: string;
+  donationConfirmedAt?: string | null;
+  contactOpen?: boolean;
+  requestOutcome?: BloodRequestStatus;
 }
 
 export interface SubscriptionRecord {
@@ -133,24 +146,12 @@ export interface SubscriptionRecord {
   paymentProvider: 'Razorpay';
   razorpayOrderId: string;
   razorpayPaymentId?: string;
-  razorpaySignature?: string;
   createdAt: string;
-}
-
-export interface DonorSearchAnalytics {
-  donorId: string;
-  totalSearchImpressions: number;
-  priorityRankOneImpressions: number;
-  searchesThisMonth: number;
-  averageResponseTimeMinutes: number;
-  badgeLevel: 'Lifesaver Silver' | 'Lifesaver Gold' | 'Lifesaver Platinum';
-  rankingPercentile: number;
 }
 
 export interface AuditLog {
   logId: string;
   actorId: string;
-  actorRole: UserRole;
   action: string;
   targetResource: string;
   timestamp: string;
@@ -166,26 +167,19 @@ export interface ChatMessage {
   requestId: string;
   matchId: string;
   senderId: string;
-  senderRole: 'requester' | 'donor' | 'system';
   senderName: string;
   text: string;
   createdAt: string;
-  read: boolean;
 }
 
 export interface DonorLiveLocation {
   donorId: string;
   requestId: string;
   matchId: string;
-  donorName: string;
-  hospitalName: string;
   currentLat: number;
   currentLng: number;
-  hospitalLat: number;
-  hospitalLng: number;
-  distanceKm: number;
-  estimatedMinutes: number;
-  transportMode: 'bike' | 'car' | 'transit';
+  distanceKm: number | null;
+  estimatedMinutes: number | null;
   status: 'en_route' | 'nearby' | 'arrived';
   lastUpdated: string;
 }
@@ -224,18 +218,4 @@ export interface DonationRecord {
   donatedAt: string;
   bloodBankVerified: boolean;
   bloodBankDoctor: string;
-}
-
-export interface FCMNotificationPayload {
-  notification: {
-    title: string;
-    body: string;
-  };
-  data: {
-    type: 'EMERGENCY_DISPATCH' | 'DONOR_ACCEPTED' | 'CHAT_MESSAGE';
-    requestId: string;
-    matchId?: string;
-    deepLink: string;
-    webRoute: string;
-  };
 }

@@ -6,6 +6,8 @@ interface BackgroundErythrocyteCanvas3DProps {
   theme: ThemeMode;
 }
 
+const FRAME_INTERVAL_MS = 33;
+
 export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas3DProps> = ({ theme }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [webglSupported, setWebglSupported] = useState(true);
@@ -29,12 +31,12 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: false,
         alpha: true,
-        powerPreference: 'high-performance'
+        powerPreference: 'low-power'
       });
       renderer.setSize(width, height);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = theme === 'light' ? 1.35 : 1.15;
       container.appendChild(renderer.domElement);
@@ -79,7 +81,7 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
     // Constructs a true, watertight, solid, closed 3D biconcave cross-section profile:
     // from (r = 0.001, z = -z(0)) along bottom curve to rounded rim at (r = R, z = 0),
     // and back along top curve to (r = 0.001, z = +z(0)).
-    const createErythrocyteGeometry = (radius: number, radialSegs = 64, tubularSegs = 64): THREE.BufferGeometry => {
+    const createErythrocyteGeometry = (radius: number, radialSegs = 24, tubularSegs = 32): THREE.BufferGeometry => {
       const points: THREE.Vector2[] = [];
       const D = radius * 2;
       const c0 = 0.207;
@@ -224,7 +226,7 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
     ];
 
     const flowCurve = new THREE.CatmullRomCurve3(curvePoints);
-    const arcGeometry = new THREE.TubeGeometry(flowCurve, 64, 0.14, 16, false);
+    const arcGeometry = new THREE.TubeGeometry(flowCurve, 40, 0.14, 8, false);
     
     // Scale curve radius dynamically to create tapered crescent ends
     const arcPos = arcGeometry.attributes.position;
@@ -336,13 +338,18 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
     window.addEventListener('scroll', handleScroll, { passive: true });
 
     // Animation Loop
-    let animId: number;
-    const clock = new THREE.Clock();
+    let animId = 0;
+    const startedAt = performance.now();
+    let lastFrame = 0;
 
-    const animate = () => {
+    const animate = (now = performance.now()) => {
       animId = requestAnimationFrame(animate);
 
-      const elapsed = clock.getElapsedTime();
+      // Decorative only: 30fps, and nothing at all while hidden or behind a dialog.
+      if (now - lastFrame < FRAME_INTERVAL_MS || document.hidden || document.querySelector('.modal-overlay')) return;
+      lastFrame = now;
+
+      const elapsed = (now - startedAt) / 1000;
 
       // Smooth Mouse Parallax Lerp
       mouseX += (targetMouseX - mouseX) * 0.04;
@@ -427,7 +434,7 @@ export const BackgroundErythrocyteCanvas3D: React.FC<BackgroundErythrocyteCanvas
       {/* 3D WebGL Canvas Layer */}
       <div 
         ref={mountRef} 
-        className="w-full h-full absolute inset-0 opacity-90 dark:opacity-80 transition-opacity" 
+        className="w-full h-full absolute inset-0 opacity-[0.16] dark:opacity-80 transition-opacity" 
       />
 
       {/* Luminous Ambient Lighting Layer behind 3D cells */}

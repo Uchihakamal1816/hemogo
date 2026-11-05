@@ -5,7 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🩸</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HemoGo — Emergency Blood & Platelet Donor Network</title>
-    <meta name="description" content="24/7 Real-Time Blood Emergency Network. Connect directly with verified whole blood and platelet donors near hospitals." />
+    <meta name="description" content="24/7 Real-Time Blood Emergency Network. Connect with blood donors near the hospital." />
     <meta name="color-scheme" content="light dark" />
     <script>
       (function() {
@@ -24,11 +24,10 @@
         } catch (e) {}
       })();
     </script>
-    <!-- Razorpay Checkout Script -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
+    <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font:800 22px system-ui,sans-serif;color:#dc2626">HemoGo</div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,157 +1,129 @@
 import * as crypto from 'crypto';
 import Razorpay from 'razorpay';
-import * as functions from 'firebase-functions';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { db } from '../config/firebase';
+import { audit } from '../matching/dispatch';
 
-// HemoGo Premium Annual Pricing: ₹299 / year (29900 paise) as defined in PRD Section 7
 export const HEMOGO_PREMIUM_PLAN = {
   planId: 'hemogo_premium_annual',
   name: 'HemoGo Premium (Annual)',
-  amountPaise: 29900, // ₹299
+  amountPaise: 29900,
+  baseAmountPaise: 25339,
+  gstAmountPaise: 4561,
   currency: 'INR',
   durationDays: 365
 } as const;
 
-function getRazorpayInstance(): Razorpay {
-  const key_id = process.env.RAZORPAY_KEY_ID || functions.config().razorpay?.key_id || 'rzp_test_placeholder';
-  const key_secret = process.env.RAZORPAY_KEY_SECRET || functions.config().razorpay?.key_secret || 'placeholder_secret';
-
-  return new Razorpay({
-    key_id,
-    key_secret
-  });
+export function hmacMatches(message: string | Buffer, secret: string, signature: unknown): boolean {
+  if (!secret || typeof signature !== 'string') return false;
+  const expected = Buffer.from(crypto.createHmac('sha256', secret).update(message).digest('hex'));
+  const received = Buffer.from(signature);
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
-/**
- * Creates a cryptographically sound Razorpay Order for ₹299/year HemoGo Premium
- */
-export async function handleCreateRazorpayOrder(
-  userId: string
-): Promise<{ orderId: string; amount: number; currency: string; planName: string; keyId: string }> {
-  if (!userId) {
-    throw new functions.https.HttpsError('unauthenticated', 'User authentication required.');
-  }
+export async function createOrder(uid: string, keyId: string, keySecret: string) {
+  if (!keyId || !keySecret) throw new HttpsError('failed-precondition', 'Payments are not configured.');
 
-  const razorpay = getRazorpayInstance();
-  const receipt = `sub_hg_${userId.slice(0, 6)}_${Date.now()}`;
-
-  try {
-    const order = await razorpay.orders.create({
-      amount: HEMOGO_PREMIUM_PLAN.amountPaise,
-      currency: HEMOGO_PREMIUM_PLAN.currency,
-      receipt,
-      notes: {
-        userId,
-        plan: HEMOGO_PREMIUM_PLAN.planId,
-        planName: HEMOGO_PREMIUM_PLAN.name
-      }
-    });
-
-    const nowIso = new Date().toISOString();
-
-    // Store pending subscription document in Firestore
-    await db.collection('subscriptions').doc(order.id).set({
-      subscriptionId: order.id,
-      userId,
-      plan: HEMOGO_PREMIUM_PLAN.planId,
-      amountPaise: HEMOGO_PREMIUM_PLAN.amountPaise,
-      currency: HEMOGO_PREMIUM_PLAN.currency,
-      paymentStatus: 'created',
-      paymentProvider: 'Razorpay',
-      razorpayOrderId: order.id,
-      createdAt: nowIso
-    });
-
-    const keyId = process.env.RAZORPAY_KEY_ID || functions.config().razorpay?.key_id || 'rzp_test_placeholder';
-
-    return {
-      orderId: order.id,
-      amount: HEMOGO_PREMIUM_PLAN.amountPaise,
-      currency: HEMOGO_PREMIUM_PLAN.currency,
-      planName: HEMOGO_PREMIUM_PLAN.name,
-      keyId
-    };
-  } catch (error: any) {
-    console.error('Error creating Razorpay order:', error);
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to initiate payment.');
-  }
-}
-
-/**
- * Cryptographically verifies the Razorpay signature and unlocks Premium status on User and Donor records
- */
-export async function handleVerifyRazorpayPayment(
-  userId: string,
-  paymentDetails: {
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-  }
-): Promise<{ success: boolean; message: string; premiumExpiry: string }> {
-  if (!userId) {
-    throw new functions.https.HttpsError('unauthenticated', 'User authentication required.');
-  }
-
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = paymentDetails;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET || functions.config().razorpay?.key_secret || 'placeholder_secret';
-
-  // 1. Compute HMAC-SHA256 signature
-  const generatedSignature = crypto
-    .createHmac('sha256', keySecret)
-    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-    .digest('hex');
-
-  const isSignatureValid = (generatedSignature === razorpay_signature) || 
-    (keySecret === 'placeholder_secret' && razorpay_signature.startsWith('mock_sig_'));
-
-  if (!isSignatureValid) {
-    throw new functions.https.HttpsError('permission-denied', 'Payment verification failed: Invalid signature.');
-  }
-
-  // 2. Fetch Subscription record
-  const subRef = db.collection('subscriptions').doc(razorpay_order_id);
-  const subDoc = await subRef.get();
-
-  if (!subDoc.exists) {
-    throw new functions.https.HttpsError('not-found', 'Subscription order record not found.');
-  }
-
-  const now = new Date();
-  const expiry = new Date(now.getTime() + HEMOGO_PREMIUM_PLAN.durationDays * 24 * 60 * 60 * 1000);
-  const nowIso = now.toISOString();
-  const expiryIso = expiry.toISOString();
-
-  // 3. Atomically update Subscription, User, and Donor records
-  const batch = db.batch();
-
-  batch.update(subRef, {
-    paymentStatus: 'paid',
-    razorpayPaymentId: razorpay_payment_id,
-    razorpaySignature: razorpay_signature,
-    startDate: nowIso,
-    expiryDate: expiryIso,
-    updatedAt: nowIso
+  const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+  const order = await razorpay.orders.create({
+    amount: HEMOGO_PREMIUM_PLAN.amountPaise,
+    currency: HEMOGO_PREMIUM_PLAN.currency,
+    receipt: `hg_${uid.slice(0, 8)}_${Date.now()}`,
+    notes: { userId: uid, plan: HEMOGO_PREMIUM_PLAN.planId }
   });
 
-  const userRef = db.collection('users').doc(userId);
-  batch.update(userRef, {
-    premiumStatus: true,
-    premiumExpiry: expiryIso,
-    updatedAt: nowIso
+  await db.collection('subscriptions').doc(order.id).set({
+    subscriptionId: order.id,
+    userId: uid,
+    plan: HEMOGO_PREMIUM_PLAN.planId,
+    amountPaise: HEMOGO_PREMIUM_PLAN.amountPaise,
+    baseAmountPaise: HEMOGO_PREMIUM_PLAN.baseAmountPaise,
+    gstAmountPaise: HEMOGO_PREMIUM_PLAN.gstAmountPaise,
+    currency: HEMOGO_PREMIUM_PLAN.currency,
+    paymentStatus: 'created',
+    paymentProvider: 'Razorpay',
+    razorpayOrderId: order.id,
+    createdAt: new Date().toISOString()
   });
-
-  const donorRef = db.collection('donors').doc(userId);
-  batch.update(donorRef, {
-    premiumStatus: true,
-    premiumExpiry: expiryIso,
-    updatedAt: nowIso
-  });
-
-  await batch.commit();
 
   return {
-    success: true,
-    message: 'Payment verified! You are now a HemoGo Premium member (Priority Emergency Match Active).',
-    premiumExpiry: expiryIso
+    orderId: order.id,
+    amount: HEMOGO_PREMIUM_PLAN.amountPaise,
+    currency: HEMOGO_PREMIUM_PLAN.currency,
+    planName: HEMOGO_PREMIUM_PLAN.name,
+    keyId
   };
+}
+
+/** Idempotent: the client callback and the webhook can both arrive for one order. */
+export async function activateSubscription(orderId: string, paymentId: string, expectedUserId?: string) {
+  const subRef = db.collection('subscriptions').doc(orderId);
+  const counterRef = db.collection('counters').doc('invoices');
+
+  const expiry = await db.runTransaction(async (tx) => {
+    const sub = (await tx.get(subRef)).data();
+    if (!sub) throw new HttpsError('not-found', 'Order not found.');
+    if (expectedUserId && sub.userId !== expectedUserId) throw new HttpsError('permission-denied', 'This order belongs to another user.');
+    if (sub.paymentStatus === 'paid') return sub.expiryDate as string;
+
+    const userRef = db.collection('users').doc(sub.userId);
+    const donorRef = db.collection('donors').doc(sub.userId);
+    const [userSnap, donorSnap, counterSnap] = await Promise.all([tx.get(userRef), tx.get(donorRef), tx.get(counterRef)]);
+    const user = userSnap.data() || {};
+
+    const now = new Date();
+    const currentExpiry = user.premiumExpiry ? new Date(user.premiumExpiry) : now;
+    const start = currentExpiry > now ? currentExpiry : now;
+    const expiryIso = new Date(start.getTime() + HEMOGO_PREMIUM_PLAN.durationDays * 24 * 60 * 60 * 1000).toISOString();
+    const nowIso = now.toISOString();
+
+    const invoiceSeq = (counterSnap.data()?.next || 1) as number;
+    tx.set(counterRef, { next: invoiceSeq + 1 }, { merge: true });
+
+    tx.update(subRef, {
+      paymentStatus: 'paid',
+      razorpayPaymentId: paymentId,
+      invoiceNumber: `INV-HG-${now.getFullYear()}-${String(invoiceSeq).padStart(6, '0')}`,
+      donorName: user.name || '',
+      donorPhone: user.phone || '',
+      donorEmail: user.email || '',
+      startDate: nowIso,
+      expiryDate: expiryIso,
+      updatedAt: nowIso
+    });
+    tx.update(userRef, { premiumStatus: true, premiumExpiry: expiryIso, updatedAt: nowIso });
+    if (donorSnap.exists) tx.update(donorRef, { premiumStatus: true, premiumExpiry: expiryIso, updatedAt: nowIso });
+    return expiryIso;
+  });
+
+  await audit(expectedUserId || 'razorpay_webhook', 'PREMIUM_ACTIVATED', `subscriptions/${orderId}`);
+  return expiry;
+}
+
+export async function verifyPayment(uid: string, keySecret: string, details: any) {
+  const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = details || {};
+  if (typeof orderId !== 'string' || typeof paymentId !== 'string') throw new HttpsError('invalid-argument', 'Incomplete payment details.');
+  if (!hmacMatches(`${orderId}|${paymentId}`, keySecret, signature)) {
+    throw new HttpsError('permission-denied', 'Payment verification failed.');
+  }
+  const premiumExpiry = await activateSubscription(orderId, paymentId, uid);
+  return { success: true, premiumExpiry };
+}
+
+export async function handleWebhook(rawBody: Buffer, signature: unknown, webhookSecret: string): Promise<number> {
+  if (!hmacMatches(rawBody, webhookSecret, signature)) return 401;
+
+  const event = JSON.parse(rawBody.toString('utf8'));
+  if (event?.event === 'payment.captured' || event?.event === 'order.paid') {
+    const payment = event.payload?.payment?.entity;
+    const orderId = payment?.order_id || event.payload?.order?.entity?.id;
+    if (orderId && payment?.id && payment.amount === HEMOGO_PREMIUM_PLAN.amountPaise) {
+      try {
+        await activateSubscription(orderId, payment.id);
+      } catch (err) {
+        if (!(err instanceof HttpsError && err.code === 'not-found')) throw err;
+      }
+    }
+  }
+  return 200;
 }

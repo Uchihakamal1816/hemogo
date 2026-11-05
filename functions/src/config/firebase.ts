@@ -1,9 +1,11 @@
-import * as admin from 'firebase-admin';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (!getApps().length) {
+  initializeApp();
 }
 
-export const db = admin.firestore();
-export const auth = admin.auth();
-export default admin;
+export const db = getFirestore();
+export const messaging = getMessaging();
+export const REGION = 'asia-south1';

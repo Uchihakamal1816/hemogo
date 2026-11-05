@@ -4,29 +4,31 @@ import {
   ShieldCheck, 
   MapPin, 
   Sparkles, 
+  Droplet, 
   Crown, 
   AlertTriangle,
   Lock,
   ArrowRight,
   Activity
 } from 'lucide-react';
-import { DispatchRadar3D } from '../3d/DispatchRadar3D';
 import { BloodMatrix3D } from '../3d/BloodMatrix3D';
 
 interface LandingPageProps {
   onOpenCreateEmergency: () => void;
+  onOpenRegisterDonor: () => void;
   onOpenPremium: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenCreateEmergency,
+  onOpenRegisterDonor,
   onOpenPremium
 }) => {
   return (
     <div className="space-y-20 pb-20">
       
       {/* Hero Section */}
-      <section className="glass-panel p-8 sm:p-12 lg:p-16 relative overflow-hidden bg-white/60 dark:bg-slate-950/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-3xl shadow-xl shadow-slate-200/30 dark:shadow-none transition-colors">
+      <section className="glass-panel p-8 sm:p-12 lg:p-16 relative overflow-hidden bg-white dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl shadow-xl shadow-slate-200/30 dark:shadow-none transition-colors">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-red-500/10 dark:bg-red-600/10 rounded-full blur-[120px] pointer-events-none"></div>
         <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-red-400/10 dark:bg-red-500/10 rounded-full blur-[100px] pointer-events-none"></div>
 
@@ -43,43 +45,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
-            HemoGo bridges critical blood shortages by instantly notifying verified donors in the exact hospital PIN area — powered by real-time geodesic dispatch, live GPS tracking, and zero-scrape donor privacy.
+            HemoGo alerts compatible donors near the hospital as soon as you ask for help. You see responses live, and your numbers stay private until a donor accepts.
           </p>
 
-          <div className="flex flex-wrap items-center gap-4 pt-2">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-4 pt-2">
             <button
               onClick={onOpenCreateEmergency}
               className="btn-primary !py-4 !px-8 text-base font-extrabold shadow-2xl shadow-red-600/30 dark:shadow-red-950/90 pulse-emergency flex items-center gap-2.5 group cursor-pointer"
             >
               <Flame className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
               <span>REQUEST BLOOD NOW</span>
-              <ArrowRight className="w-4 h-4 text-red-200 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" />
             </button>
 
-            
+            <button
+              onClick={onOpenRegisterDonor}
+              className="btn-emerald !py-4 !px-8 text-base font-extrabold shadow-2xl shadow-emerald-600/30 dark:shadow-emerald-950/90 flex items-center gap-2.5 cursor-pointer"
+            >
+              <Droplet className="w-5 h-5 fill-white" />
+              <span>BECOME A DONOR</span>
+            </button>
           </div>
 
           {/* Core Privacy & Technology Pillars */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-6 pt-3 text-xs sm:text-sm">
-            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm backdrop-blur-sm">
+            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
               <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Zero-Scrape Privacy</span>
             </span>
-            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm backdrop-blur-sm">
+            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
               <MapPin className="w-4 h-4 text-red-600 dark:text-red-400" />
               <span>PIN-Code Matching</span>
             </span>
-            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm backdrop-blur-sm">
+            <span className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 shadow-sm">
               <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>OTP Verified</span>
             </span>
           </div>
         </div>
-      </section>
-
-      {/* 3D Holographic Dispatch Radar Engine */}
-      <section className="space-y-4">
-        <DispatchRadar3D />
       </section>
 
       {/* Clinical Blood Compatibility Visualizer */}
@@ -96,7 +99,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white">How HemoGo Works</h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            A fast 4-step emergency bridge connecting patients and verified local donors
+            A fast 4-step emergency bridge connecting patients and local donors
           </p>
         </div>
 
@@ -158,10 +161,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            Premium members receive top priority dispatch in emergency request matching in their PIN code, instant WhatsApp notifications, and automated donation certificates.
+            Everyone's first alerts go out immediately. Premium members' searches widen sooner when no donor has accepted, and member donors are listed first.
           </p>
 
-          <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium italic">
+          <p className="text-[11px] text-amber-800 dark:text-amber-400 font-medium italic">
             * Note: Premium status provides priority matching notifications but does not override medical compatibility or donor eligibility.
           </p>
         </div>
