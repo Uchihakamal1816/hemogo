@@ -49,3 +49,12 @@ dist-ssr
 *.iml
 *.ipr
 *.iws
+
+# Firebase
+.firebase/
+*-debug.log
+functions/.secret.local
+functions/.env
+
+# Google credentials created during deploys
+gha-creds-*.json

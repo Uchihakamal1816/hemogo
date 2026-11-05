@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -11,112 +10,113 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
     function isAdmin() {
-      return isAuthenticated() && getUserData().role == 'admin';
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // ============================================================================
-    // 1. Users Collection (/users/{userId})
-    // ============================================================================
+    function matchData(matchId) {
+      return get(/databases/$(database)/documents/matches/$(matchId)).data;
+    }
+
+    // Chat and location only open between the two parties after the donor accepts.
+    function isPartyToAcceptedMatch(matchId) {
+      let m = matchData(matchId);
+      return isAuthenticated() && m.response == 'ACCEPTED' &&
+        (m.donorId == request.auth.uid || m.requesterId == request.auth.uid);
+    }
+
+    // Live contact ends when the request closes or either side withdraws.
+    function hasOpenContact(matchId) {
+      return isPartyToAcceptedMatch(matchId) && matchData(matchId).contactOpen == true;
+    }
+
+    // Users: roles and premium can never be self-assigned; admins are promoted in the console.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'premiumStatus', 'status'])) || isAdmin();
+      allow create: if isOwner(userId) &&
+        request.resource.data.userId == userId &&
+        request.resource.data.phone == request.auth.token.phone_number &&
+        request.resource.data.role in ['donor', 'requester', 'both'] &&
+        request.resource.data.premiumStatus == false &&
+        request.resource.data.status == 'active' &&
+        !('premiumExpiry' in request.resource.data);
+      allow update: if (isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'email', 'pinCode', 'updatedAt'])) || isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ============================================================================
-    // 2. Donors Collection (/donors/{donorId})
-    // STRICT ZERO-SCRAPE PRIVACY: Normal users CANNOT query or browse the donor directory!
-    // ============================================================================
+    // Donors: zero-scrape. Created by registerDonor; availability changes go through
+    // toggleDonorAvailability so the medical cooldown cannot be skipped.
     match /donors/{donorId} {
       allow read: if isOwner(donorId) || isAdmin();
-
-      allow create: if isOwner(donorId) &&
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.verificationStatus == false &&
-        request.resource.data.premiumStatus == false;
-
+      allow create: if false;
       allow update: if (isOwner(donorId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'premiumStatus', 'premiumExpiry'])) || isAdmin();
-
-      allow delete: if isOwner(donorId) || isAdmin();
-    }
-
-    // ============================================================================
-    // 3. Blood Emergency Requests (/bloodRequests/{requestId})
-    // ============================================================================
-    match /bloodRequests/{requestId} {
-      allow read: if isAuthenticated();
-
-      allow create: if isAuthenticated() &&
-        request.resource.data.requesterId == request.auth.uid &&
-        request.resource.data.status in ['SEARCHING', 'DONORS_NOTIFIED'];
-
-      allow update: if (isAuthenticated() && resource.data.requesterId == request.auth.uid) || isAdmin();
-
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'email', 'alternatePhone', 'city', 'pinCode', 'preferredRadiusKm', 'updatedAt'])) || isAdmin();
+      // Owners cannot delete: re-registering would erase the medical cooldown.
       allow delete: if isAdmin();
     }
 
-    // ============================================================================
-    // 4. Matches Collection (/matches/{matchId})
-    // Contacts only shared when donor accepts after preliminary screening
-    // ============================================================================
+    match /deviceTokens/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Requests carry patient details, so only the requester and admins read them.
+    // Donors see a reduced copy on their match. All writes are server-side.
+    match /bloodRequests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.requesterId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Donor name and phone are only written here by the server after acceptance.
+    // Requesters see nothing about a donor until that donor accepts.
     match /matches/{matchId} {
       allow read: if isAuthenticated() && (
         resource.data.donorId == request.auth.uid ||
-        resource.data.requestId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeRequests ||
+        (resource.data.requesterId == request.auth.uid && resource.data.response == 'ACCEPTED') ||
         isAdmin()
       );
-
-      allow create: if isAdmin();
-
-      allow update: if isAuthenticated() && resource.data.donorId == request.auth.uid;
-
-      allow delete: if isAdmin();
+      allow write: if false;
     }
 
-    // ============================================================================
-    // 5. In-App Private Chat System (/chats/{requestId}/messages/{messageId})
-    // Only unlocked after donor acceptance; strictly accessible by matched parties
-    // ============================================================================
-    match /chats/{requestId}/messages/{messageId} {
-      allow read, write: if isAuthenticated() && (
-        request.auth.uid == get(/databases/$(database)/documents/bloodRequests/$(requestId)).data.requesterId ||
-        request.auth.uid == resource.data.senderId ||
-        isAdmin()
-      );
+    match /chats/{matchId}/messages/{messageId} {
+      allow read: if isPartyToAcceptedMatch(matchId) || isAdmin();
+      allow create: if hasOpenContact(matchId) &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.matchId == matchId &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 1000 &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
     }
 
-    // ============================================================================
-    // 6. Live Location & Distance Tracking (/locations/{matchId})
-    // ============================================================================
     match /locations/{matchId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (
-        request.auth.uid == resource.data.donorId ||
-        isAdmin()
-      );
+      allow read: if hasOpenContact(matchId) || isAdmin();
+      allow write: if hasOpenContact(matchId) && matchData(matchId).donorId == request.auth.uid;
     }
 
-    // ============================================================================
-    // 7. Subscriptions (/subscriptions/{subId})
-    // ============================================================================
     match /subscriptions/{subId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if isAdmin();
+      allow write: if false;
     }
 
-    // ============================================================================
-    // 8. Audit Logs (/auditLogs/{logId})
-    // ============================================================================
+    match /donations/{donationId} {
+      allow read: if isAuthenticated() && (resource.data.donorId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Health answers are never shown to the requester.
+    match /screenings/{matchId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /auditLogs/{logId} {
       allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow write: if false;
     }
   }
 }

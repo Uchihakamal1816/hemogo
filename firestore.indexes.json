@@ -1,40 +1,18 @@
 {
   "indexes": [
-    {
-      "collectionGroup": "donors",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "bloodGroup", "order": "ASCENDING" },
-        { "fieldPath": "isAvailable", "order": "ASCENDING" },
-        { "fieldPath": "location.city", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "donors",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "isAvailable", "order": "ASCENDING" },
-        { "fieldPath": "donationCount", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "emergency_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "bloodGroup", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "emergency_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "city", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    }
+    { "collectionGroup": "donors", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "availability", "order": "ASCENDING" },
+      { "fieldPath": "bloodGroup", "order": "ASCENDING" },
+      { "fieldPath": "pinCode", "order": "ASCENDING" } ] },
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "premiumStatus", "order": "ASCENDING" },
+      { "fieldPath": "premiumExpiry", "order": "ASCENDING" } ] },
+    { "collectionGroup": "bloodRequests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "requesterId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "bloodRequests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "nextEscalationAt", "order": "ASCENDING" } ] }
   ],
   "fieldOverrides": []
 }

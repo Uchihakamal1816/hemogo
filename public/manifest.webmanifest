@@ -1,0 +1,9 @@
+{
+  "name": "HemoGo Emergency Blood Network",
+  "short_name": "HemoGo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#dc2626",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
