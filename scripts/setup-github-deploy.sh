@@ -53,8 +53,10 @@ for role in \
   echo "Granted $role"
 done
 
-# Deploying functions means running them as the default runtime account, and nothing broader.
-gcloud iam service-accounts add-iam-policy-binding "$PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
-  --member="serviceAccount:$DEPLOYER_EMAIL" --role=roles/iam.serviceAccountUser --condition=None >/dev/null
+# Deploying functions means running them as the default runtime accounts, and nothing broader.
+for runtime_account in "$PROJECT_NUMBER-compute@developer.gserviceaccount.com" "$PROJECT_ID@appspot.gserviceaccount.com"; do
+  gcloud iam service-accounts add-iam-policy-binding "$runtime_account" \
+    --member="serviceAccount:$DEPLOYER_EMAIL" --role=roles/iam.serviceAccountUser --condition=None >/dev/null
+done
 
 echo "Setup complete. Changes can take up to 5 minutes to apply."
