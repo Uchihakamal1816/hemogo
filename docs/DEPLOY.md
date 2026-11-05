@@ -15,6 +15,9 @@
 7. In Razorpay, add a webhook for `payment.captured` and `order.paid` pointing at the deployed `razorpayWebhook` URL.
 8. Make the first admin: set `role` to `admin` on their `users/{uid}` document in the Firebase console. The app cannot do this.
 
+## Checks
+Pull requests run `.github/workflows/ci.yml`: web build and lint, backend unit tests, and end-to-end tests on the Firebase emulators.
+
 ## Deploy
 ```bash
 npm --prefix functions test
