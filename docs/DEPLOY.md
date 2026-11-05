@@ -26,6 +26,11 @@ firebase deploy
 ```
 Indexes can take several minutes to build. Requests will fail until they finish.
 
+## Automatic deployment
+After CI passes on `main`, `.github/workflows/deploy.yml` deploys functions, then the website, then rules and indexes. GitHub logs in to Google with Workload Identity Federation, so no password or key is stored. Only `main` of this repository can use it.
+
+One-time setup: run `scripts/setup-github-deploy.sh` in Google Cloud Shell, and set the repository variables `VITE_FIREBASE_API_KEY` and `VITE_FIREBASE_VAPID_KEY`. To redeploy by hand, use **Actions → Deploy → Run workflow** on `main`.
+
 ## Check on real phones before going public
 - [ ] Real SMS sign-in on two phones
 - [ ] A request alerts a donor whose app is closed
