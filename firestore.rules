@@ -43,7 +43,7 @@ service cloud.firestore {
         !('premiumExpiry' in request.resource.data);
       allow update: if (isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['name', 'email', 'pinCode', 'updatedAt'])) || isAdmin();
+          .hasOnly(['name', 'email', 'pinCode', 'donorDecision', 'updatedAt'])) || isAdmin();
       allow delete: if isAdmin();
     }
 

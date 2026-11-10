@@ -3,9 +3,6 @@ import {
   Flame, 
   ShieldCheck, 
   MapPin, 
-  Sparkles, 
-  Droplet, 
-  Crown, 
   AlertTriangle,
   Lock,
   ArrowRight,
@@ -15,14 +12,10 @@ import { BloodMatrix3D } from '../3d/BloodMatrix3D';
 
 interface LandingPageProps {
   onOpenCreateEmergency: () => void;
-  onOpenRegisterDonor: () => void;
-  onOpenPremium: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
-  onOpenCreateEmergency,
-  onOpenRegisterDonor,
-  onOpenPremium
+  onOpenCreateEmergency
 }) => {
   return (
     <div className="space-y-20 pb-20">
@@ -58,13 +51,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <ArrowRight className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" />
             </button>
 
-            <button
-              onClick={onOpenRegisterDonor}
-              className="btn-emerald !py-4 !px-8 text-base font-extrabold shadow-2xl shadow-emerald-600/30 dark:shadow-emerald-950/90 flex items-center gap-2.5 cursor-pointer"
-            >
-              <Droplet className="w-5 h-5 fill-white" />
-              <span>BECOME A DONOR</span>
-            </button>
           </div>
 
           {/* Core Privacy & Technology Pillars */}
@@ -146,36 +132,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
         </div>
-      </section>
-
-      {/* HemoGo Premium Feature Banner */}
-      <section className="glass-panel p-8 sm:p-10 rounded-3xl border border-amber-300 dark:border-amber-500/30 bg-gradient-to-r from-amber-50/90 via-white/95 to-amber-100/50 dark:from-slate-900 dark:via-slate-900/95 dark:to-amber-950/20 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 transition-colors shadow-lg shadow-amber-500/5 dark:shadow-none">
-        <div className="space-y-3 max-w-xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 text-xs font-bold">
-            <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <span>HemoGo Premium — ₹299 / Year</span>
-          </div>
-
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-            Priority Emergency Matching for Dedicated Donors
-          </h2>
-
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            Everyone's first alerts go out immediately. Premium members' searches widen sooner when no donor has accepted, and member donors are listed first.
-          </p>
-
-          <p className="text-[11px] text-amber-800 dark:text-amber-400 font-medium italic">
-            * Note: Premium status provides priority matching notifications but does not override medical compatibility or donor eligibility.
-          </p>
-        </div>
-
-        <button
-          onClick={onOpenPremium}
-          className="btn-primary !py-3.5 !px-8 text-sm font-bold bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400 flex-shrink-0 shadow-lg shadow-amber-500/20"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Join Premium (₹299/yr)</span>
-        </button>
       </section>
 
       {/* Medical Safety Disclaimer */}
