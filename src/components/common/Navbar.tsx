@@ -1,13 +1,12 @@
 import React from 'react';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   HeartHandshake, 
   Flame, 
-  Crown, 
   ShieldCheck, 
   LogOut, 
   LogIn, 
-  Sparkles, 
-  Droplet,
   Radio,
   Sliders,
   Sun,
@@ -22,9 +21,7 @@ interface NavbarProps {
   setActiveTab: (tab: 'home' | 'requester_status' | 'donor_dashboard' | 'admin') => void;
   sessionReady: boolean;
   onOpenAuth: () => void;
-  onOpenRegisterDonor: () => void;
   onOpenCreateEmergency: () => void;
-  onOpenPremium: () => void;
   onLogout: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
@@ -36,13 +33,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   sessionReady,
   onOpenAuth,
-  onOpenRegisterDonor,
   onOpenCreateEmergency,
-  onOpenPremium,
   onLogout,
   theme,
   onToggleTheme
 }) => {
+  const [confirmLogout, setConfirmLogout] = useState(false);
   return (
     <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950/90 px-4 lg:px-8 py-3 transition-colors">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
@@ -135,35 +131,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="hidden sm:inline">Request Blood</span>
           </button>
 
-          {/* Become a Donor CTA */}
-          <button
-            onClick={onOpenRegisterDonor}
-            className="hidden 2xl:inline-flex whitespace-nowrap items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/80 hover:bg-emerald-600 hover:text-white font-bold text-xs transition-all"
-          >
-            <Droplet className="w-3.5 h-3.5" />
-            <span>Join Donors</span>
-          </button>
-
-          {/* Premium Status or Upgrade */}
-          {currentUser?.premiumStatus ? (
-            <div
-              onClick={onOpenPremium}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-xs font-bold cursor-pointer hover:scale-105 transition-all shadow-sm"
-              title="HemoGo Premium (₹299/yr) Active"
-            >
-              <Crown className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 fill-amber-400" />
-              <span>Premium</span>
-            </div>
-          ) : (
-            <button
-              onClick={onOpenPremium}
-              className="hidden 2xl:inline-flex whitespace-nowrap items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-xs hover:brightness-110 transition-all shadow-sm"
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>Premium ₹299</span>
-            </button>
-          )}
-
           {/* Light / Dark Mode Toggle Button */}
           <button
             onClick={onToggleTheme}
@@ -186,12 +153,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="text-[10px] text-slate-500 dark:text-slate-400">{currentUser.phone}</div>
               </div>
               <button
-                onClick={onLogout}
+                onClick={() => setConfirmLogout(true)}
                 className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                 title="Sign out"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
+              {confirmLogout && createPortal(
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" onClick={() => setConfirmLogout(false)}>
+                  <div role="dialog" aria-modal="true" aria-labelledby="logout-title" className="glass-panel-elevated max-w-sm w-full p-6 space-y-4 rounded-2xl" onClick={(e) => e.stopPropagation()}>
+                    <h2 id="logout-title" className="text-lg font-bold text-slate-900 dark:text-white">Log out of HemoGo?</h2>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">You will need to verify your phone number with OTP to sign in again.</p>
+                    <div className="flex gap-2 justify-end">
+                      <button type="button" onClick={() => setConfirmLogout(false)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-200">Cancel</button>
+                      <button type="button" onClick={() => { setConfirmLogout(false); onLogout(); }} className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">Log out</button>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
             </div>
           ) : !sessionReady ? (
             <div className="w-20 h-8" aria-hidden="true" />

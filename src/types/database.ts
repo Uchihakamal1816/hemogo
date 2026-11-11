@@ -17,6 +17,8 @@ export interface UserProfile {
   premiumExpiry?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set to 'declined' when the user says they do not want to be a donor. */
+  donorDecision?: 'declined';
 }
 
 export type DonorAvailability = 'available' | 'unavailable';

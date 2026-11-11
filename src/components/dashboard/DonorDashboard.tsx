@@ -42,23 +42,15 @@ import { startSharingLocation } from '../../services/locationService';
 import { EmergencyChatModal } from '../chat/EmergencyChatModal';
 import { DonationHistoryModal } from '../history/DonationHistoryModal';
 import { DonorSettingsModal } from './DonorSettingsModal';
-import { PremiumAnalyticsWidget } from './PremiumAnalyticsWidget';
-import { PremiumReceiptModal } from '../premium/PremiumReceiptModal';
-import { subscribeToUserSubscription } from '../../services/razorpayService';
-import type { SubscriptionRecord } from '../../types/database';
 
 interface DonorDashboardProps {
   currentUser: UserProfile | null;
-  onOpenRegister: () => void;
   onOpenAuth: () => void;
-  onOpenPremium: () => void;
 }
 
 export const DonorDashboard: React.FC<DonorDashboardProps> = ({
   currentUser,
-  onOpenRegister,
-  onOpenAuth,
-  onOpenPremium
+  onOpenAuth
 }) => {
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [pendingMatches, setPendingMatches] = useState<MatchRecord[]>([]);
@@ -87,8 +79,6 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
 
   const [showDonationHistory, setShowDonationHistory] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -106,8 +96,7 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         const byPriority = [...matches].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         setPendingMatches(byPriority.filter((m) => m.response === 'PENDING'));
         setAcceptedMatches(byPriority.filter((m) => m.response === 'ACCEPTED' && m.contactOpen && !m.donationConfirmedAt));
-      }),
-      subscribeToUserSubscription(currentUser.userId, setSubscription)
+      })
     ];
     getPushState().then(setPushState);
     return () => stops.forEach((stop) => stop());
@@ -278,9 +267,6 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto">
           Complete your 1-minute donor profile to start receiving emergency requests in your PIN code area.
         </p>
-        <button onClick={onOpenRegister} className="btn-primary !py-3 !px-6 text-sm font-bold mx-auto">
-          <span>Register as Blood Donor</span>
-        </button>
       </div>
     );
   }
@@ -577,14 +563,6 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
           </button>
         </div>
 
-        {/* HemoGo Premium Analytics & Receipt Card */}
-        <PremiumAnalyticsWidget
-          donor={donor}
-          subscription={subscription}
-          onOpenReceipt={() => setShowReceiptModal(true)}
-          onOpenUpgradeModal={onOpenPremium}
-        />
-
       </div>
 
       {/* Preliminary Medical Screening Modal */}
@@ -724,13 +702,6 @@ export const DonorDashboard: React.FC<DonorDashboardProps> = ({
         isOpen={showSettingsModal}
         donor={donor}
         onClose={() => setShowSettingsModal(false)}
-      />
-
-      {/* HemoGo Premium GST Tax Invoice Receipt Modal */}
-      <PremiumReceiptModal
-        isOpen={showReceiptModal}
-        subscription={subscription}
-        onClose={() => setShowReceiptModal(false)}
       />
 
     </div>

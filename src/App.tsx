@@ -5,13 +5,15 @@ import {
 } from 'lucide-react';
 import type { UserProfile } from './types/database';
 import { subscribeToSession, logoutUser } from './services/authService';
-import { auth, isFirebaseConfigured } from './config/firebase';
+import { auth, db, isFirebaseConfigured } from './config/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { parseDeepLinkRoute } from './services/deepLinkService';
 import { initTheme, toggleTheme, type ThemeMode } from './services/themeService';
 import { Navbar } from './components/common/Navbar';
 import { LandingPage } from './components/home/LandingPage';
 import { PhoneAuthModal } from './components/auth/PhoneAuthModal';
 import { DonorRegisterModal } from './components/onboarding/DonorRegisterModal';
+import { DonorConsentPrompt } from './components/onboarding/DonorConsentPrompt';
 import { EmergencyRequestModal } from './components/onboarding/EmergencyRequestModal';
 import { PremiumModal } from './components/premium/PremiumModal';
 
@@ -59,6 +61,7 @@ export const App: React.FC = () => {
   // Modals
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showRegisterDonorModal, setShowRegisterDonorModal] = useState(false);
+  const [showDonorConsent, setShowDonorConsent] = useState(false);
   const [showCreateEmergencyModal, setShowCreateEmergencyModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
@@ -80,8 +83,6 @@ export const App: React.FC = () => {
   };
 
   const openEmergency = () => requireLogin(() => setShowCreateEmergencyModal(true));
-  const openRegister = () => requireLogin(() => setShowRegisterDonorModal(true));
-  const openPremium = () => requireLogin(() => setShowPremiumModal(true));
 
   const handleToggleTheme = () => {
     const nextTheme = toggleTheme();
@@ -130,6 +131,29 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Ask every signed-in user who has no donor profile whether they are willing to donate.
+  const signedInUserId = currentUser?.userId;
+  const donorDecision = currentUser?.donorDecision;
+  useEffect(() => {
+    if (!signedInUserId || donorDecision === 'declined') {
+      setShowDonorConsent(false);
+      return;
+    }
+    let cancelled = false;
+    getDoc(doc(db, 'donors', signedInUserId))
+      .then((snap) => { if (!cancelled) setShowDonorConsent(!snap.exists()); })
+      .catch((err) => console.error('Donor check failed:', err));
+    return () => { cancelled = true; };
+  }, [signedInUserId, donorDecision]);
+
+  const handleDonorNo = () => {
+    setShowDonorConsent(false);
+    if (currentUser) {
+      updateDoc(doc(db, 'users', currentUser.userId), { donorDecision: 'declined', updatedAt: new Date().toISOString() })
+        .catch((err) => console.error('Could not save donor choice:', err));
+    }
+  };
+
   const handleLogout = async () => {
     await logoutUser();
     setCurrentUser(null);
@@ -164,9 +188,7 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab}
         onOpenAuth={() => setShowAuthModal(true)}
         sessionReady={sessionReady}
-        onOpenRegisterDonor={openRegister}
         onOpenCreateEmergency={openEmergency}
-        onOpenPremium={openPremium}
         onLogout={handleLogout}
         theme={theme}
         onToggleTheme={handleToggleTheme}
@@ -179,8 +201,6 @@ export const App: React.FC = () => {
         {activeTab === 'home' && (
           <LandingPage
             onOpenCreateEmergency={openEmergency}
-            onOpenRegisterDonor={openRegister}
-            onOpenPremium={openPremium}
           />
         )}
 
@@ -199,9 +219,7 @@ export const App: React.FC = () => {
             {activeTab === 'donor_dashboard' && (
               <DonorDashboard
                 currentUser={currentUser}
-                onOpenRegister={openRegister}
                 onOpenAuth={() => setShowAuthModal(true)}
-                onOpenPremium={openPremium}
               />
             )}
 
@@ -247,6 +265,16 @@ export const App: React.FC = () => {
             if (!auth.currentUser) pendingAfterLogin.current = null;
           }, 0);
         }}
+      />
+
+      <DonorConsentPrompt
+        isOpen={showDonorConsent && !!currentUser}
+        userId={currentUser?.userId ?? ''}
+        onYes={() => {
+          setShowDonorConsent(false);
+          setShowRegisterDonorModal(true);
+        }}
+        onNo={handleDonorNo}
       />
 
       <DonorRegisterModal
