@@ -121,14 +121,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           
-          {/* Raise Emergency Blood CTA */}
+          {/* Raise Emergency Blood CTA — hidden on xs to avoid crowding the brand on 390px phones */}
           <button
             onClick={onOpenCreateEmergency}
-            className="inline-flex whitespace-nowrap items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-500 transition-all shadow-md shadow-red-600/20"
+            className="hidden sm:inline-flex whitespace-nowrap items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-500 transition-all shadow-md shadow-red-600/20"
           >
-            <Flame className="hidden sm:block w-3.5 h-3.5 fill-white" />
-            <span className="sm:hidden">Request</span>
-            <span className="hidden sm:inline">Request Blood</span>
+            <Flame className="w-3.5 h-3.5 fill-white" />
+            <span>Request Blood</span>
           </button>
 
           {/* Light / Dark Mode Toggle Button */}
@@ -208,6 +207,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           className={`py-1 px-2 rounded-lg whitespace-nowrap ${activeTab === 'donor_dashboard' ? 'text-white bg-slate-900 dark:text-red-400 dark:bg-red-950' : 'text-slate-600 dark:text-slate-400'}`}
         >
           Donor Dashboard
+        </button>
+        {/* Request Blood shortcut visible only on xs (below sm) */}
+        <button
+          onClick={onOpenCreateEmergency}
+          className="sm:hidden py-1 px-2 rounded-lg whitespace-nowrap bg-red-600 text-white"
+        >
+          🩸 Request
         </button>
         {currentUser?.role === 'admin' && (
           <button
